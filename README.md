@@ -1,2 +1,2 @@
-# creative_rentals
+# creative-rentals
 Creative rentals management app
