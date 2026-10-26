@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Creative Rentals</title>
+<style>
+/* ─── CSS Variables ─────────────────────────────────── */
+:root {
+  --primary:#1a1a2e; --primary-light:#16213e; --accent:#E8520A;
+  --accent-hover:#c94308; --text:#f0f0f0; --text-dim:#9ca3af;
+  --green:#22c55e; --green-light:#dcfce7; --red:#ef4444;
+  --yellow:#f59e0b; --border:#2d2d4e; --card:#1e1e3a;
+  --input-bg:#252542; --sidebar-w:240px; --header-h:60px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--primary);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+
+/* ─── Auth screen ───────────────────────────────────── */
+#auth-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--primary)}
+.auth-box{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:40px;width:360px;max-width:95vw}
+.auth-box img{display:block;margin:0 auto 24px;background:#fff;border-radius:12px;padding:10px 14px;width:240px;max-width:100%;height:auto}
+.auth-box h2{text-align:center;font-size:1.3rem;margin-bottom:24px;color:var(--text-dim)}
+.auth-error{background:#7f1d1d;color:#fca5a5;padding:10px 14px;border-radius:8px;font-size:.87rem;margin-bottom:16px;display:none}
+
+/* ─── Layout ────────────────────────────────────────── */
+#app{display:none;flex-direction:row;min-height:100vh}
+#sidebar{width:var(--sidebar-w);background:var(--primary-light);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;overflow-y:auto}
+#main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh}
+#topbar{height:var(--header-h);background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:50}
+#page-content{flex:1;padding:24px}
+
+/* ─── Sidebar ───────────────────────────────────────── */
+.sidebar-logo{padding:20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.sidebar-logo{justify-content:center}
+.sidebar-logo img{background:#fff;border-radius:10px;padding:8px 10px}
+.sidebar-logo img{width:190px;max-width:100%;height:auto;object-fit:contain}
+.nav-section{padding:12px 0}
+.nav-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);padding:6px 20px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;cursor:pointer;transition:.2s;font-size:.93rem;color:var(--text-dim);border-left:3px solid transparent}
+.nav-item:hover{color:var(--text);background:rgba(255,255,255,.04)}
+.nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(232,82,10,.08)}
+.nav-item svg{flex-shrink:0;width:18px;height:18px}
+.sidebar-bottom{margin-top:auto;border-top:1px solid var(--border);padding:16px}
+.user-pill{display:flex;align-items:center;gap:10px;font-size:.88rem}
+.user-avatar{width:32px;height:32px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0}
+.user-name{font-weight:600}
+.user-role{font-size:.75rem;color:var(--text-dim)}
+.btn-logout{margin-top:10px;width:100%;padding:8px;background:transparent;border:1px solid var(--border);color:var(--text-dim);border-radius:8px;cursor:pointer;font-size:.85rem;transition:.2s}
+.btn-logout:hover{border-color:var(--red);color:var(--red)}
+
+/* ─── Forms & Inputs ────────────────────────────────── */
+.form-group{margin-bottom:16px}
+label{display:block;font-size:.82rem;color:var(--text-dim);margin-bottom:6px;font-weight:500}
+input,select,textarea{width:100%;padding:9px 12px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.93rem;transition:.2s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+textarea{resize:vertical;min-height:70px}
+select option{background:var(--card)}
+.input-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.input-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+/* ─── Buttons ───────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border:none;border-radius:8px;cursor:pointer;font-size:.9rem;font-weight:600;transition:.2s}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-secondary{background:var(--card);border:1px solid var(--border);color:var(--text)}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent)}
+.btn-danger{background:#7f1d1d;color:#fca5a5;border:none}
+.btn-danger:hover{background:var(--red);color:#fff}
+.btn-sm{padding:5px 12px;font-size:.8rem}
+.btn-icon{padding:6px;border-radius:6px;background:var(--input-bg);border:1px solid var(--border);color:var(--text-dim);cursor:pointer;transition:.2s}
+.btn-icon:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ─── Cards ─────────────────────────────────────────── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.card-title{font-size:1rem;font-weight:700}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px}
+.stat-label{font-size:.8rem;color:var(--text-dim);margin-bottom:6px}
+.stat-value{font-size:1.6rem;font-weight:800;color:var(--accent)}
+.stat-sub{font-size:.78rem;color:var(--text-dim);margin-top:4px}
+
+/* ─── Tables ────────────────────────────────────────── */
+.table-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th{background:var(--primary-light);padding:10px 14px;text-align:left;font-size:.77rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim)}
+td{padding:11px 14px;border-top:1px solid var(--border)}
+tr:hover td{background:rgba(255,255,255,.025)}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:700}
+.badge-active{background:#14532d;color:#4ade80}
+.badge-returned{background:#1e3a5f;color:#60a5fa}
+.badge-overdue{background:#7f1d1d;color:#fca5a5}
+.badge-cancelled{background:#374151;color:#9ca3af}
+.badge-admin{background:#4c1d95;color:#c4b5fd}
+.badge-staff{background:#1e3a5f;color:#93c5fd}
+.badge-superadmin{background:#7c2d12;color:#fdba74}
+
+/* ─── Modals ─────────────────────────────────────────── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:none;align-items:center;justify-content:center;padding:16px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto}
+.modal-lg{max-width:780px}
+.modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.modal-title{font-size:1.1rem;font-weight:700}
+.modal-close{background:none;border:none;color:var(--text-dim);font-size:1.4rem;cursor:pointer;line-height:1}
+.modal-footer{display:flex;justify-content:flex-end;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+
+/* ─── Search / Filter bar ───────────────────────────── */
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.search-wrap{position:relative;flex:1;min-width:180px}
+.search-wrap input{padding-left:36px}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-dim);pointer-events:none}
+
+/* ─── Toast ─────────────────────────────────────────── */
+#toast{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+.toast-msg{padding:12px 18px;border-radius:10px;font-size:.88rem;font-weight:600;animation:slide-in .3s ease;max-width:320px}
+.toast-success{background:#14532d;color:#4ade80;border:1px solid #166534}
+.toast-error{background:#7f1d1d;color:#fca5a5;border:1px solid #991b1b}
+.toast-info{background:var(--primary-light);color:var(--text);border:1px solid var(--border)}
+@keyframes slide-in{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* ─── Invoice ───────────────────────────────────────── */
+.invoice-wrap{background:#fff;color:#111;padding:32px;border-radius:12px;font-size:.88rem;line-height:1.5}
+.invoice-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #E8520A}
+.invoice-logo{width:220px;height:auto}
+.invoice-title{text-align:right}
+.invoice-title h2{font-size:1.5rem;color:#E8520A;margin:0}
+.inv-table{width:100%;border-collapse:collapse;margin:14px 0}
+.inv-table th,.inv-table td{border:1px solid #ddd;padding:8px 10px;text-align:left;font-size:.82rem}
+.inv-table th{background:#f5f5f5;font-weight:700}
+.inv-table tfoot tr:last-child td{font-weight:700;background:#fff8f5}
+@media print{body *{visibility:hidden}#printable-invoice,#printable-invoice *{visibility:visible}#printable-invoice{position:absolute;left:0;top:0;width:100%;padding:0}.modal-overlay{position:static}}
+.inv-terms{margin-top:18px;font-size:.75rem;color:#555;border-top:1px solid #ddd;padding-top:12px}
+.inv-terms h4{margin-bottom:6px;font-size:.82rem;color:#E8520A}
+.inv-terms ol{padding-left:18px}
+.inv-terms li{margin-bottom:4px}
+
+/* ─── Misc ──────────────────────────────────────────── */
+.page-title{font-size:1.4rem;font-weight:800;margin-bottom:20px}
+.empty{text-align:center;padding:60px 20px;color:var(--text-dim)}
+.loading{text-align:center;padding:40px;color:var(--text-dim)}
+.text-red{color:var(--red)}
+.text-green{color:var(--green)}
+.text-dim{color:var(--text-dim)}
+.text-accent{color:var(--accent)}
+.mt-2{margin-top:8px}.mt-3{margin-top:12px}.mb-2{margin-bottom:8px}
+.flex{display:flex}.gap-2{gap:8px}.items-center{align-items:center}.justify-between{justify-content:space-between}
+.w-full{width:100%}
+@media(max-width:640px){
+  #sidebar{transform:translateX(-100%);transition:.3s}
+  #sidebar.open{transform:translateX(0)}
+  #main{margin-left:0}
+  #topbar{padding:0 14px}
+  #page-content{padding:14px}
+  .input-row,.input-row-3{grid-template-columns:1fr}
+  .stat-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ── Auth Screen ──────────────────────────────────────────────────────── -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <img id="auth-logo" src="/logo.png" alt="Creative Rentals">
+    <h2>Sign in to your account</h2>
+    <div class="auth-error" id="auth-error"></div>
+    <form id="login-form" onsubmit="doLogin(event)">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="inp-username" autocomplete="username" required>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="inp-password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn btn-primary w-full" id="login-btn">Sign In</button>
+    </form>
+  </div>
+</div>
+
+<!-- ── App Shell ─────────────────────────────────────────────────────────── -->
+<div id="app">
+  <!-- Sidebar -->
+  <nav id="sidebar">
+    <div class="sidebar-logo">
+      <img id="sidebar-logo" src="/logo.png" alt="Creative Rentals">
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Main</div>
+      <div class="nav-item active" data-page="dashboard" onclick="navigate('dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </div>
+      <div class="nav-item" data-page="rentals" onclick="navigate('rentals')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg>
+        Rentals
+      </div>
+      <div class="nav-item" data-page="clients" onclick="navigate('clients')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Clients
+      </div>
+      <div class="nav-item" data-page="equipment" onclick="navigate('equipment')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7 16 1 1 16l7 7 15-15Z"/><path d="m3.5 21.5 3-3"/></svg>
+        Equipment
+      </div>
+      <div class="nav-item" data-page="payments" onclick="navigate('payments')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        Payments
+      </div>
+      <div class="nav-item" data-page="reports" onclick="navigate('reports')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Reports
+      </div>
+    </div>
+    <div class="nav-section admin-only" id="admin-nav" style="display:none">
+      <div class="nav-label">Admin</div>
+      <div class="nav-item" data-page="users" onclick="navigate('users')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        Users
+      </div>
+      <div class="nav-item" id="nav-settings" data-page="settings" onclick="navigate('settings')" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+        Settings
+      </div>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="user-pill">
+        <div class="user-avatar" id="user-avatar">A</div>
+        <div>
+          <div class="user-name" id="user-name-display">—</div>
+          <div class="user-role" id="user-role-display">—</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="doLogout()">Sign Out</button>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <div id="main">
+    <header id="topbar">
+      <button class="btn-icon" id="menu-btn" onclick="toggleSidebar()" style="display:none">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <span id="topbar-title" style="font-weight:700;font-size:1rem">Dashboard</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-primary btn-sm" id="topbar-action" style="display:none"></button>
+      </div>
+    </header>
+    <div id="page-content">
+      <div class="loading">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modals ─────────────────────────────────────────────────────────────── -->
+<!-- Client Modal -->
+<div class="modal-overlay" id="modal-client">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-client-title">Add Client</span>
+      <button class="modal-close" onclick="closeModal('modal-client')">&times;</button>
+    </div>
+    <div class="input-row">
+      <div class="form-group"><label>Full Name *</label><input id="cl-name" placeholder="Full name"></div>
+      <div class="form-group"><label>Phone</label><input id="cl-phone" placeholder="0XX XXX XXXX"></div>
+    </div>
+    <div class="input-row">
+      <div class="form-group"><label>Email</label><input id="cl-email" type="email" placeholder="email@example.com"></div>
+      <div class="form-group"><label>Company</label><input id="cl-company" placeholder="Company name"></div>
+    </div>
+    <div class="input-row">
+      <div class="form-group"><label>ID Number</label><input id="cl-idnum" placeholder="ID number"></div>
+      <div class="form-group"><label>Ghana Card Number</label><input id="cl-ghana" placeholder="GHA-XXXXXXXXX-X"></div>
+    </div>
+    <div class="form-group"><label>Notes</label><textarea id="cl-notes" rows="3" placeholder="Any notes…"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-client')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveClient()">Save Client</button>
+    </div>
+  </div>
+</div>
+
+<!-- Equipment Modal -->
+<div class="modal-overlay" id="modal-equipment">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-eq-title">Add Equipment</span>
+      <button class="modal-close" onclick="closeModal('modal-equipment')">&times;</button>
+    </div>
+    <div class="input-row">
+      <div class="form-group"><label>Name *</label><input id="eq-name" placeholder="Equipment name"></div>
+      <div class="form-group"><label>Category *</label>
+        <select id="eq-cat">
+          <option>Accessories</option><option>Audio</option><option>Camera</option><option>Cinema Camera</option><option>Drone</option><option>Lens</option><option>Lighting</option><option>Monitor/Recorder</option><option>Stabilizer</option><option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="input-row">
+      <div class="form-group"><label>Serial Number</label><input id="eq-serial" placeholder="SN-XXX-000"></div>
+      <div class="form-group"><label>Total Qty</label><input id="eq-total" type="number" min="1" value="1"></div>
+    </div>
+    <div class="input-row">
+      <div class="form-group"><label>Rate per Day, 8am–5pm (GH₵)</label><input id="eq-price" type="number" min="0" step="0.01" value="0"></div>
+      <div class="form-group"><label>Deposit (GH₵)</label><input id="eq-deposit" type="number" min="0" step="0.01" value="0"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-equipment')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEquipment()">Save Equipment</button>
+    </div>
+  </div>
+</div>
+
+<!-- New Rental Modal -->
+<div class="modal-overlay" id="modal-rental">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title">New Rental</span>
+      <button class="modal-close" onclick="closeModal('modal-rental')">&times;</button>
+    </div>
+    <div class="form-group">
+      <label>Client *</label>
+      <select id="rnt-client"><option value="">— select client —</option></select>
+    </div>
+    <div class="input-row">
+      <div class="form-group"><label>Rental Date * <span class="text-dim">(pickup 8:00 AM)</span></label><input id="rnt-start" type="date"></div>
+      <div class="form-group"><label>Return Date * <span class="text-dim">(by 5:00 PM)</span></label><input id="rnt-end" type="date"></div>
+    </div>
+    <div class="input-row">
+      <div class="form-group"><label>Pickup</label><input value="8:00 AM" disabled></div>
+      <div class="form-group"><label>Return</label><input value="5:00 PM" disabled></div>
+    </div>
+    <div class="form-group">
+      <label>Equipment</label>
+      <div id="rnt-eq-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+      <button class="btn btn-secondary btn-sm" onclick="addEquipmentRow()">+ Add Item</button>
+    </div>
+    <div class="form-group"><label>Notes</label><textarea id="rnt-notes" rows="2" placeholder="Any additional notes…"></textarea></div>
+    <div id="rnt-total-row" style="text-align:right;font-weight:700;color:var(--accent);margin-top:8px;font-size:1.05rem"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-rental')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRental()">Create Rental</button>
+    </div>
+  </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="modal-overlay" id="modal-payment">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Record Payment</span>
+      <button class="modal-close" onclick="closeModal('modal-payment')">&times;</button>
+    </div>
+    <div class="form-group"><label>Rental</label><input id="pmt-rental-label" disabled></div>
+    <div class="input-row">
+      <div class="form-group"><label>Amount (GH₵) *</label><input id="pmt-amount" type="number" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="form-group"><label>Method</label>
+        <select id="pmt-method">
+          <option value="cash">Cash</option>
+          <option value="momo">Mobile Money</option>
+          <option value="bank_transfer">Bank Transfer</option>
+          <option value="cheque">Cheque</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>Reference / MoMo No.</label><input id="pmt-ref" placeholder="Optional transaction reference"></div>
+    <div class="form-group"><label>Note</label><input id="pmt-note" placeholder="Optional note"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-payment')">Cancel</button>
+      <button class="btn btn-primary" onclick="savePayment()">Record Payment</button>
+    </div>
+  </div>
+</div>
+
+<!-- Invoice Modal -->
+<div class="modal-overlay" id="modal-invoice">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title">Invoice / Receipt</span>
+      <button class="modal-close" onclick="closeModal('modal-invoice')">&times;</button>
+    </div>
+    <div id="invoice-content"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="window.print()">🖨 Print</button>
+      <button class="btn btn-primary" id="btn-whatsapp" onclick="shareWhatsApp()">📲 Share WhatsApp</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-invoice')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- User Modal -->
+<div class="modal-overlay" id="modal-user">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-user-title">Add User</span>
+      <button class="modal-close" onclick="closeModal('modal-user')">&times;</button>
+    </div>
+    <div class="input-row">
+      <div class="form-group"><label>Full Name *</label><input id="usr-name" placeholder="Full name"></div>
+      <div class="form-group"><label>Username *</label><input id="usr-username" placeholder="username"></div>
+    </div>
+    <div class="input-row">
+      <div class="form-group"><label>Password *</label><input id="usr-password" type="password" placeholder="Min 6 characters"></div>
+      <div class="form-group"><label>Role</label>
+        <select id="usr-role"></select>
+        <div id="usr-role-note" class="text-dim" style="font-size:.75rem;margin-top:4px"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-user')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveUser()">Save User</button>
+    </div>
+  </div>
+</div>
+
+<!-- Clear Data Modal -->
+<div class="modal-overlay" id="modal-clear">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="clr-title">Clear data</span>
+      <button class="modal-close" onclick="closeModal('modal-clear')">&times;</button>
+    </div>
+    <p id="clr-desc" style="font-size:.92rem;margin-bottom:12px;line-height:1.5"></p>
+    <div style="background:#7f1d1d;color:#fca5a5;padding:10px 14px;border-radius:8px;font-size:.85rem;margin-bottom:16px">This cannot be undone.</div>
+    <div class="form-group"><label>Type <strong id="clr-word-label"></strong> to confirm</label><input id="clr-word" autocomplete="off"></div>
+    <div class="form-group"><label>Your Super Admin password</label><input id="clr-pass" type="password" autocomplete="current-password"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-clear')">Cancel</button>
+      <button class="btn btn-danger" id="clr-btn" onclick="doClear()">Clear permanently</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  API helpers
+// ═══════════════════════════════════════════════════════════════════
+const BASE = window.location.origin;
+let _token = localStorage.getItem('cr_token') || '';
+let _currentUser = JSON.parse(localStorage.getItem('cr_user') || 'null');
+
+async function api(method, path, body) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json', ..._token ? { Authorization: 'Bearer ' + _token } : {} }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(BASE + path, opts);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || r.statusText);
+  return data;
+}
+const GET    = (path)        => api('GET',    path);
+const POST   = (path, body)  => api('POST',   path, body);
+const PATCH  = (path, body)  => api('PATCH',  path, body);
+const DELETE = (path)        => api('DELETE', path);
+
+// ═══════════════════════════════════════════════════════════════════
+//  Auth
+// ═══════════════════════════════════════════════════════════════════
+async function doLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('auth-error');
+  err.style.display = 'none';
+  btn.textContent = 'Signing in…'; btn.disabled = true;
+  try {
+    const { token, user } = await POST('/api/auth/login', {
+      username: document.getElementById('inp-username').value,
+      password: document.getElementById('inp-password').value
+    });
+    _token = token;
+    _currentUser = user;
+    localStorage.setItem('cr_token', token);
+    localStorage.setItem('cr_user', JSON.stringify(user));
+    bootApp();
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.style.display = 'block';
+    btn.textContent = 'Sign In'; btn.disabled = false;
+  }
+}
+
+function doLogout() {
+  _token = ''; _currentUser = null;
+  localStorage.removeItem('cr_token');
+  localStorage.removeItem('cr_user');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+}
+
+async function bootApp() {
+  // Validate token with server
+  try {
+    const { user } = await GET('/api/auth/me');
+    _currentUser = user;
+    localStorage.setItem('cr_user', JSON.stringify(user));
+  } catch {
+    doLogout(); return;
+  }
+
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  // Set user pill
+  const init = (_currentUser.name || '?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('user-avatar').textContent       = init;
+  document.getElementById('user-name-display').textContent = _currentUser.name;
+  document.getElementById('user-role-display').textContent = ROLE_LABEL[_currentUser.role] || _currentUser.role;
+
+  // Show admin nav
+  if (isAdmin()) {
+    document.getElementById('admin-nav').style.display = 'block';
+    document.getElementById('nav-settings').style.display = isSuperAdmin() ? 'flex' : 'none';
+  }
+
+  // Mobile menu button
+  if (window.innerWidth <= 640) {
+    document.getElementById('menu-btn').style.display = 'flex';
+  }
+
+  navigate('dashboard');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Navigation
+// ═══════════════════════════════════════════════════════════════════
+const PAGES = { dashboard: renderDashboard, rentals: renderRentals, clients: renderClients,
+                equipment: renderEquipment, payments: renderPaymentsPage,
+                reports: renderReports, users: renderUsers, settings: renderSettings };
+
+let _page = 'dashboard';
+
+function navigate(page) {
+  if (!PAGES[page]) return;
+  _page = page;
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === page));
+  const titles = { dashboard:'Dashboard', rentals:'Rentals', clients:'Clients',
+                   equipment:'Equipment', payments:'Payments', reports:'Reports', users:'Users', settings:'Settings' };
+  document.getElementById('topbar-title').textContent = titles[page] || page;
+  const action = document.getElementById('topbar-action');
+  action.style.display = 'none';
+  document.getElementById('page-content').innerHTML = '<div class="loading">Loading…</div>';
+  PAGES[page]();
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Helpers
+// ═══════════════════════════════════════════════════════════════════
+function ghc(n) { return 'GH₵ ' + parseFloat(n||0).toLocaleString('en-GH', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function fmtDate(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}); }
+const PERIOD_LABEL = '8:00 AM – 5:00 PM';
+function periodText(r) {
+  return (!r.end_date || r.start_date === r.end_date)
+    ? `${fmtDate(r.start_date)}, ${PERIOD_LABEL}`
+    : `${fmtDate(r.start_date)} 8:00 AM – ${fmtDate(r.end_date)} 5:00 PM`;
+}
+// 8am–5pm days from rental date to return date, inclusive (same day = 1)
+function rentalDays(s, e) { if (!s || !e || e <= s) return 1; return Math.round((Date.parse(e) - Date.parse(s)) / 86400000) + 1; }
+const ROLE_LABEL = { superadmin:'Super Admin', admin:'Admin', staff:'Staff' };
+function isAdmin() { return !!_currentUser && (_currentUser.role === 'admin' || _currentUser.role === 'superadmin'); }
+function isSuperAdmin() { return !!_currentUser && _currentUser.role === 'superadmin'; }
+function today() { return new Date().toISOString().slice(0,10); }
+
+function toast(msg, type='success') {
+  const t = document.createElement('div');
+  t.className = `toast-msg toast-${type}`;
+  t.textContent = msg;
+  document.getElementById('toast').appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function statusBadge(s) {
+  const map = { active:'badge-active', returned:'badge-returned', overdue:'badge-overdue', cancelled:'badge-cancelled' };
+  return `<span class="badge ${map[s]||'badge-returned'}">${s}</span>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Dashboard
+// ═══════════════════════════════════════════════════════════════════
+async function renderDashboard() {
+  try {
+    const stats = await GET('/api/reports/dashboard');
+    const recentRentals = await GET('/api/rentals?status=active');
+
+    let recent = '';
+    recentRentals.slice(0,5).forEach(r => {
+      recent += `<tr>
+        <td>#R-${String(r.id).padStart(4,'0')}</td>
+        <td>${r.client_name||'—'}</td>
+        <td>${periodText(r)}</td>
+        <td>${statusBadge(r.status)}</td>
+        <td>${ghc(r.subtotal)}</td>
+        <td><button class="btn-icon btn-sm" onclick="showInvoice(${r.id})">📄</button></td>
+      </tr>`;
+    });
+
+    document.getElementById('page-content').innerHTML = `
+      <h1 class="page-title">Welcome back, ${_currentUser.name.split(' ')[0]} 👋</h1>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Active Rentals</div><div class="stat-value text-accent">${stats.active_rentals}</div></div>
+        <div class="stat-card"><div class="stat-label">Overdue</div><div class="stat-value text-red">${stats.overdue_rentals}</div></div>
+        <div class="stat-card"><div class="stat-label">Total Clients</div><div class="stat-value">${stats.total_clients}</div></div>
+        <div class="stat-card"><div class="stat-label">Equipment Items</div><div class="stat-value">${stats.total_equipment}</div></div>
+        <div class="stat-card"><div class="stat-label">This Month Revenue</div><div class="stat-value text-green">${ghc(stats.month_revenue)}</div><div class="stat-sub">collected</div></div>
+        <div class="stat-card"><div class="stat-label">Outstanding</div><div class="stat-value text-red">${ghc(stats.outstanding)}</div><div class="stat-sub">unpaid balance</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Recent Active Rentals</span>
+          <button class="btn btn-primary btn-sm" onclick="navigate('rentals')">View All</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>Client</th><th>Dates</th><th>Status</th><th>Amount</th><th></th></tr></thead>
+            <tbody>${recent || '<tr><td colspan="6" class="empty">No active rentals</td></tr>'}</tbody>
+          </table>
+        </div>
+      </div>`;
+  } catch (err) {
+    document.getElementById('page-content').innerHTML = `<div class="empty text-red">${err.message}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Clients
+// ═══════════════════════════════════════════════════════════════════
+let _clientEdit = null;
+
+async function renderClients() {
+  const action = document.getElementById('topbar-action');
+  action.textContent = '+ New Client'; action.style.display = 'flex';
+  action.onclick = () => openClientModal(null);
+
+  try {
+    const clients = await GET('/api/clients');
+    let rows = '';
+    clients.forEach(c => {
+      rows += `<tr>
+        <td>${c.name}</td>
+        <td>${c.phone||'—'}</td>
+        <td>${c.email||'—'}</td>
+        <td>${c.ghana_card||'—'}</td>
+        <td>${fmtDate(c.joined)}</td>
+        <td>
+          <div class="flex gap-2">
+            <button class="btn-icon btn-sm" title="Edit" onclick="openClientModal(${c.id})">✏️</button>
+            <button class="btn-icon btn-sm" title="Delete" onclick="deleteClient(${c.id},'${c.name.replace(/'/g,"\\'")}')">🗑️</button>
+          </div>
+        </td>
+      </tr>`;
+    });
+
+    document.getElementById('page-content').innerHTML = `
+      <h1 class="page-title">Clients</h1>
+      <div class="toolbar">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input placeholder="Search clients…" id="client-search" oninput="filterClients(this.value)">
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="clients-table">
+          <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Ghana Card</th><th>Joined</th><th></th></tr></thead>
+          <tbody id="clients-tbody">${rows || '<tr><td colspan="6" class="empty">No clients yet</td></tr>'}</tbody>
+        </table>
+      </div>`;
+    _allClients = clients;
+  } catch (err) { document.getElementById('page-content').innerHTML = `<div class="empty text-red">${err.message}</div>`; }
+}
+
+let _allClients = [];
+function filterClients(q) {
+  q = q.toLowerCase();
+  const rows = _allClients.filter(c =>
+    (c.name||'').toLowerCase().includes(q) ||
+    (c.phone||'').toLowerCase().includes(q) ||
+    (c.ghana_card||'').toLowerCase().includes(q) ||
+    (c.company||'').toLowerCase().includes(q)
+  );
+  document.getElementById('clients-tbody').innerHTML = rows.map(c => `
+    <tr>
+      <td>${c.name}</td><td>${c.phone||'—'}</td><td>${c.email||'—'}</td>
+      <td>${c.ghana_card||'—'}</td><td>${fmtDate(c.joined)}</td>
+      <td><div class="flex gap-2">
+        <button class="btn-icon btn-sm" onclick="openClientModal(${c.id})">✏️</button>
+        <button class="btn-icon btn-sm" onclick="deleteClient(${c.id},'${c.name.replace(/'/g,"\\'")}')">🗑️</button>
+      </div></td>
+    </tr>`).join('') || '<tr><td colspan="6" class="empty">No matches</td></tr>';
+}
+
+async function openClientModal(id) {
+  _clientEdit = id;
+  document.getElementById('modal-client-title').textContent = id ? 'Edit Client' : 'Add Client';
+  const fields = ['name','phone','email','company','idnum','ghana'];
+  fields.forEach(f => document.getElementById('cl-'+f).value = '');
+  document.getElementById('cl-notes').value = '';
+
+  if (id) {
+    try {
+      const c = await GET('/api/clients/'+id);
+      document.getElementById('cl-name').value    = c.name||'';
+      document.getElementById('cl-phone').value   = c.phone||'';
+      document.getElementById('cl-email').value   = c.email||'';
+      document.getElementById('cl-company').value = c.company||'';
+      document.getElementById('cl-idnum').value   = c.id_number||'';
+      document.getElementById('cl-ghana').value   = c.ghana_card||'';
+      document.getElementById('cl-notes').value   = c.notes||'';
+    } catch (err) { toast(err.message, 'error'); return; }
+  }
+  openModal('modal-client');
+}
+
+async function saveClient() {
+  const body = {
+    name: document.getElementById('cl-name').value.trim(),
+    phone: document.getElementById('cl-phone').value.trim(),
+    email: document.getElementById('cl-email').value.trim(),
+    company: document.getElementById('cl-company').value.trim(),
+    id_number: document.getElementById('cl-idnum').value.trim(),
+    ghana_card: document.getElementById('cl-ghana').value.trim(),
+    notes: document.getElementById('cl-notes').value.trim()
+  };
+  if (!body.name) { toast('Client name is required', 'error'); return; }
+  try {
+    if (_clientEdit) await PATCH('/api/clients/'+_clientEdit, body);
+    else await POST('/api/clients', body);
+    closeModal('modal-client');
+    toast('Client saved');
+    renderClients();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function deleteClient(id, name) {
+  if (!confirm(`Delete client "${name}"? This cannot be undone.`)) return;
+  try {
+    await DELETE('/api/clients/'+id);
+    toast('Client deleted');
+    renderClients();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Equipment
+// ═══════════════════════════════════════════════════════════════════
+let _eqEdit = null, _allEquipment = [];
+
+async function renderEquipment() {
+  const action = document.getElementById('topbar-action');
+  if (isAdmin()) {
+    action.textContent = '+ New Item'; action.style.display = 'flex';
+    action.onclick = () => openEqModal(null);
+  }
+
+  try {
+    _allEquipment = await GET('/api/equipment');
+    let rows = '';
+    _allEquipment.forEach(e => {
+      rows += `<tr>
+        <td>${e.serial||'—'}</td>
+        <td>${e.name}</td>
+        <td>${e.category}</td>
+        <td>${ghc(e.price)}/day</td>
+        <td>${ghc(e.deposit)}</td>
+        <td><span class="badge ${e.available>0?'badge-active':'badge-overdue'}">${e.available}/${e.total}</span></td>
+        ${isAdmin()?`<td><div class="flex gap-2">
+          <button class="btn-icon btn-sm" onclick="openEqModal(${e.id})">✏️</button>
+          <button class="btn-icon btn-sm" onclick="deleteEq(${e.id},'${e.name.replace(/'/g,"\\'")}')">🗑️</button>
+        </div></td>`:'<td></td>'}
+      </tr>`;
+    });
+
+    document.getElementById('page-content').innerHTML = `
+      <h1 class="page-title">Equipment</h1>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Serial</th><th>Name</th><th>Category</th><th>Rate/day (8am–5pm)</th><th>Deposit</th><th>Available</th><th></th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="7" class="empty">No equipment yet</td></tr>'}</tbody>
+        </table>
+      </div>`;
+  } catch (err) { document.getElementById('page-content').innerHTML = `<div class="empty text-red">${err.message}</div>`; }
+}
+
+async function openEqModal(id) {
+  _eqEdit = id;
+  document.getElementById('modal-eq-title').textContent = id ? 'Edit Equipment' : 'Add Equipment';
+  ['name','serial','total','price','deposit'].forEach(f => document.getElementById('eq-'+f).value = f==='total'?1:0);
+  document.getElementById('eq-cat').value = 'Camera';
+
+  if (id) {
+    try {
+      const e = _allEquipment.find(x=>x.id===id) || await GET('/api/equipment/'+id);
+      document.getElementById('eq-name').value    = e.name;
+      document.getElementById('eq-serial').value  = e.serial||'';
+      document.getElementById('eq-cat').value     = e.category;
+      document.getElementById('eq-total').value   = e.total;
+      document.getElementById('eq-price').value   = e.price;
+      document.getElementById('eq-deposit').value = e.deposit;
+    } catch (err) { toast(err.message,'error'); return; }
+  }
+  openModal('modal-equipment');
+}
+
+async function saveEquipment() {
+  const body = {
+    name: document.getElementById('eq-name').value.trim(),
+    serial: document.getElementById('eq-serial').value.trim() || null,
+    category: document.getElementById('eq-cat').value,
+    total: parseInt(document.getElementById('eq-total').value)||1,
+    available: parseInt(document.getElementById('eq-total').value)||1,
+    price: parseFloat(document.getElementById('eq-price').value)||0,
+    deposit: parseFloat(document.getElementById('eq-deposit').value)||0
+  };
+  if (!body.name) { toast('Name is required','error'); return; }
+  try {
+    if (_eqEdit) await PATCH('/api/equipment/'+_eqEdit, body);
+    else await POST('/api/equipment', body);
+    closeModal('modal-equipment');
+    toast('Equipment saved');
+    renderEquipment();
+  } catch (err) { toast(err.message,'error'); }
+}
+
+async function deleteEq(id, name) {
+  if (!confirm(`Delete "${name}"?`)) return;
+  try {
+    await DELETE('/api/equipment/'+id);
+    toast('Equipment deleted');
+    renderEquipment();
+  } catch (err) { toast(err.message,'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Rentals
+// ═══════════════════════════════════════════════════════════════════
+async function renderRentals() {
+  const action = document.getElementById('topbar-action');
+  action.textContent = '+ New Rental'; action.style.display = 'flex';
+  action.onclick = () => openRentalModal();
+
+  try {
+    const rentals = await GET('/api/rentals');
+    let rows = '';
+    rentals.forEach(r => {
+      const items = (r.equipment||[]).map(e=>e.name).join(', ');
+      rows += `<tr>
+        <td>#R-${String(r.id).padStart(4,'0')}</td>
+        <td>${r.client_name||'—'}</td>
+        <td>${items||'—'}</td>
+        <td>${periodText(r)}</td>
+        <td>${statusBadge(r.status)}</td>
+        <td>${ghc(r.subtotal)}</td>
+        <td>${ghc(r.total_paid)}</td>
+        <td>
+          <div class="flex gap-2">
+            <button class="btn-icon btn-sm" title="Invoice" onclick="showInvoice(${r.id})">📄</button>
+            <button class="btn-icon btn-sm" title="Payment" onclick="openPaymentModal(${r.id},'${r.client_name||''}',${(+r.subtotal)+(+r.deposit_amt)},${r.total_paid})">💰</button>
+            ${(r.status==='active'||r.status==='overdue')?`<button class="btn-icon btn-sm" title="Mark Returned" onclick="markReturned(${r.id})">✅</button>`:''}
+            <button class="btn-icon btn-sm" title="Delete" onclick="deleteRental(${r.id})">🗑️</button>
+          </div>
+        </td>
+      </tr>`;
+    });
+
+    document.getElementById('page-content').innerHTML = `
+      <h1 class="page-title">Rentals</h1>
+      <div class="toolbar">
+        <select id="rnt-filter" onchange="filterRentalsByStatus(this.value)" style="width:160px">
+          <option value="">All statuses</option>
+          <option value="active">Active</option>
+          <option value="returned">Returned</option>
+          <option value="overdue">Overdue</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Client</th><th>Equipment</th><th>Dates</th><th>Status</th><th>Total</th><th>Paid</th><th></th></tr></thead>
+          <tbody id="rentals-tbody">${rows || '<tr><td colspan="8" class="empty">No rentals yet</td></tr>'}</tbody>
+        </table>
+      </div>`;
+    _allRentals = rentals;
+  } catch (err) { document.getElementById('page-content').innerHTML = `<div class="empty text-red">${err.message}</div>`; }
+}
+
+let _allRentals = [];
+function filterRentalsByStatus(status) {
+  const filtered = status ? _allRentals.filter(r=>r.status===status) : _allRentals;
+  document.getElementById('rentals-tbody').innerHTML = filtered.map(r => {
+    const items = (r.equipment||[]).map(e=>e.name).join(', ');
+    return `<tr>
+      <td>#R-${String(r.id).padStart(4,'0')}</td>
+      <td>${r.client_name||'—'}</td>
+      <td>${items||'—'}</td>
+      <td>${periodText(r)}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td>${ghc(r.subtotal)}</td>
+      <td>${ghc(r.total_paid)}</td>
+      <td><div class="flex gap-2">
+        <button class="btn-icon btn-sm" onclick="showInvoice(${r.id})">📄</button>
+        <button class="btn-icon btn-sm" onclick="openPaymentModal(${r.id},'${r.client_name||''}',${(+r.subtotal)+(+r.deposit_amt)},${r.total_paid})">💰</button>
+        ${(r.status==='active'||r.status==='overdue')?`<button class="btn-icon btn-sm" onclick="markReturned(${r.id})">✅</button>`:''}
+        <button class="btn-icon btn-sm" onclick="deleteRental(${r.id})">🗑️</button>
+      </div></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" class="empty">No rentals</td></tr>';
+}
+
+// Rental modal
+let _eqRows = [];
+async function openRentalModal() {
+  _eqRows = [];
+  document.getElementById('rnt-eq-list').innerHTML = '';
+  document.getElementById('rnt-total-row').textContent = '';
+  document.getElementById('rnt-notes').value = '';
+  document.getElementById('rnt-start').value = today();
+  document.getElementById('rnt-end').value   = today();
+  document.getElementById('rnt-end').min     = today();
+
+  // Populate client dropdown
+  const clients = _allClients.length ? _allClients : await GET('/api/clients');
+  _allClients = clients;
+  const sel = document.getElementById('rnt-client');
+  sel.innerHTML = '<option value="">— select client —</option>' +
+    clients.map(c => `<option value="${c.id}">${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('');
+
+  // Ensure equipment is loaded
+  if (!_allEquipment.length) _allEquipment = await GET('/api/equipment');
+  addEquipmentRow();
+  openModal('modal-rental');
+}
+
+function addEquipmentRow() {
+  const id = Date.now();
+  _eqRows.push(id);
+  const opts = _allEquipment.map(e =>
+    `<option value="${e.id}" data-price="${e.price}" data-deposit="${e.deposit}" data-avail="${e.available}">${e.name} (${ghc(e.price)}/day)</option>`
+  ).join('');
+
+  const div = document.createElement('div');
+  div.id = 'eq-row-'+id;
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 80px auto;gap:8px;align-items:center';
+  div.innerHTML = `
+    <select onchange="calcRentalTotal()">${opts}</select>
+    <input type="number" min="1" value="1" placeholder="Qty" style="width:100%" oninput="calcRentalTotal()">
+    <button class="btn-icon" onclick="removeEqRow('${id}')">✕</button>`;
+  document.getElementById('rnt-eq-list').appendChild(div);
+  calcRentalTotal();
+}
+
+function removeEqRow(id) {
+  document.getElementById('eq-row-'+id)?.remove();
+  _eqRows = _eqRows.filter(r=>r!==id);
+  calcRentalTotal();
+}
+
+function calcRentalTotal() {
+  const start = document.getElementById('rnt-start').value;
+  const endEl = document.getElementById('rnt-end');
+  if (start) { endEl.min = start; if (!endEl.value || endEl.value < start) endEl.value = start; }
+  const days = rentalDays(start, endEl.value);
+  let subtotal=0, deposit=0;
+  document.querySelectorAll('#rnt-eq-list > div').forEach(row => {
+    const sel = row.querySelector('select');
+    const qty = parseInt(row.querySelector('input').value)||1;
+    const opt = sel.selectedOptions[0];
+    const price   = parseFloat(opt.dataset.price)||0;
+    const dep     = parseFloat(opt.dataset.deposit)||0;
+    subtotal += price * qty * days;
+    deposit  += dep * qty;
+  });
+  document.getElementById('rnt-total-row').textContent =
+    `${days>1 ? days+' days' : 'Same day, 8:00 AM – 5:00 PM'} — Subtotal: ${ghc(subtotal)} + Deposit: ${ghc(deposit)} = ${ghc(subtotal+deposit)}`;
+}
+
+async function saveRental() {
+  const client_id  = document.getElementById('rnt-client').value;
+  const rental_date = document.getElementById('rnt-start').value;
+  const return_date = document.getElementById('rnt-end').value || rental_date;
+  if (!client_id)   { toast('Select a client','error'); return; }
+  if (!rental_date) { toast('Rental date required','error'); return; }
+  if (return_date < rental_date) { toast('Return date cannot be before the rental date','error'); return; }
+  const equipment = [];
+  document.querySelectorAll('#rnt-eq-list > div').forEach(row => {
+    const sel = row.querySelector('select');
+    const qty = parseInt(row.querySelector('input').value)||1;
+    const opt = sel.selectedOptions[0];
+    equipment.push({
+      equipment_id: parseInt(sel.value),
+      qty,
+      unit_price:   parseFloat(opt.dataset.price)||0,
+      unit_deposit: parseFloat(opt.dataset.deposit)||0
+    });
+  });
+  if (!equipment.length) { toast('Add at least one equipment item','error'); return; }
+
+  try {
+    await POST('/api/rentals', {
+      client_id: parseInt(client_id), rental_date, return_date,
+      equipment,
+      notes: document.getElementById('rnt-notes').value || null
+    });
+    closeModal('modal-rental');
+    toast('Rental created');
+    _allEquipment = []; // refresh availability
+    renderRentals();
+  } catch (err) { toast(err.message,'error'); }
+}
+
+async function markReturned(id) {
+  if (!confirm('Mark rental #R-'+String(id).padStart(4,'0')+' as Returned?')) return;
+  try {
+    await PATCH('/api/rentals/'+id, { status:'returned' });
+    toast('Marked as returned');
+    _allEquipment = [];
+    renderRentals();
+  } catch (err) { toast(err.message,'error'); }
+}
+
+async function deleteRental(id) {
+  if (!confirm('Delete rental #R-'+String(id).padStart(4,'0')+'? This cannot be undone.')) return;
+  try {
+    await DELETE('/api/rentals/'+id);
+    toast('Rental deleted');
+    _allEquipment = [];
+    renderRentals();
+  } catch (err) { toast(err.message,'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Payments page
+// ═══════════════════════════════════════════════════════════════════
+async function renderPaymentsPage() {
+  try {
+    const payments = await GET('/api/payments');
+    let rows = '';
+    payments.forEach(p => {
+      const mLabel = { cash:'Cash',momo:'Mobile Money',bank_transfer:'Bank Transfer',cheque:'Cheque',other:'Other' };
+      rows += `<tr>
+        <td>${fmtDate(p.paid_at)}</td>
+        <td>#R-${String(p.rental_id).padStart(4,'0')}</td>
+        <td>${ghc(p.amount)}</td>
+        <td>${mLabel[p.method]||p.method}</td>
+        <td>${p.reference||'—'}</td>
+        <td>${p.note||'—'}</td>
+      </tr>`;
+    });
+    document.getElementById('page-content').innerHTML = `
+      <h1 class="page-title">Payments</h1>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Rental</th><th>Amount</th><th>Method</th><th>Reference</th><th>Note</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="6" class="empty">No payments recorded</td></tr>'}</tbody>
+        </table>
+      </div>`;
+  } catch (err) { document.getElementById('page-content').innerHTML = `<div class="empty text-red">${err.message}</div>`; }
+}
+
+// ─── Payment modal ───────────────────────────────────────────────
+let _pmtRentalId = null;
+function openPaymentModal(rentalId, clientName, subtotal, paid) {
+  _pmtRentalId = rentalId;
+  document.getElementById('pmt-rental-label').value = `#R-${String(rentalId).padStart(4,'0')} — ${clientName} (Balance: ${ghc(subtotal-paid)})`;
+  document.getElementById('pmt-amount').value  = Math.max(0, (subtotal-paid)).toFixed(2);
+  document.getElementById('pmt-method').value  = 'cash';
+  document.getElementById('pmt-ref').value     = '';
+  document.getElementById('pmt-note').value    = '';
+  openModal('modal-payment');
+}
+
+async function savePayment() {
+  const amount = parseFloat(document.getElementById('pmt-amount').value);
+  if (!amount || amount <= 0) { toast('Enter a valid amount','error'); return; }
+  try {
+    await POST('/api/payments', {
+      rental_id: _pmtRentalId,
+      amount,
+      method:    document.getElementById('pmt-method').value,
+      reference: document.getElementById('pmt-ref').value || null,
+      note:      document.getElementById('pmt-note').value || null
+    });
+    closeModal('modal-payment');
+    toast('Payment recorded');
+    if (_page === 'rentals') renderRentals();
+    else if (_page === 'payments') renderPaymentsPage();
+  } catch (err) { toast(err.message,'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Invoice
+// ═══════════════════════════════════════════════════════════════════
+let _invoiceRental = null;
+const LOGO_SRC = document.getElementById('auth-logo').src;
+
+async function showInvoice(id) {
+  try {
+    const r = await GET('/api/rentals/'+id);
+    _invoiceRental = r;
+    const items = (r.equipment||[]).map(e =>
+      `<tr><td>${e.name}</td><td>${e.serial||'—'}</td><td>${e.qty}</td>
+       <td>${ghc(e.unit_price)}${(r.days||1)>1?' × '+r.days+' days':''}</td><td>${ghc(e.unit_price*e.qty*(r.days||1))}</td></tr>`
+    ).join('');
+
+    const paid     = parseFloat(r.total_paid||0);
+    const subtotal = parseFloat(r.subtotal||0);
+    const deposit  = parseFloat(r.deposit_amt||0);
+    const balance  = subtotal + deposit - paid;
+
+    document.getElementById('invoice-content').innerHTML = `
+    <div class="invoice-wrap" id="printable-invoice">
+      <div class="invoice-header">
+        <div>
+          <img src="${LOGO_SRC}" class="invoice-logo" alt="Creative Rentals">
+          <div style="margin-top:8px;font-size:.8rem;color:#555">
+            Adum-Kumasi, Opposite Oyerepa FM &amp; Bosheba Building<br>
+            Tel: 0241 334 486 | 024 816 4307<br>
+            creativerentals25@gmail.com
+          </div>
+        </div>
+        <div class="invoice-title">
+          <h2>RENTAL INVOICE</h2>
+          <p style="color:#888;font-size:.82rem">#R-${String(r.id).padStart(4,'0')}</p>
+          <p style="font-size:.82rem">Date: ${fmtDate(new Date())}</p>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;font-size:.82rem">
+        <div>
+          <strong style="color:#E8520A">BILLED TO</strong><br>
+          ${r.client_name||'—'}<br>
+          ${r.client_phone||''}<br>
+          ${r.client_email||''}<br>
+          ${r.ghana_card?'Ghana Card: '+r.ghana_card:''}
+        </div>
+        <div>
+          <strong style="color:#E8520A">RENTAL PERIOD</strong><br>
+          ${(!r.end_date || r.start_date === r.end_date)
+            ? `Date: ${fmtDate(r.start_date)}<br>Pickup: 8:00 AM<br>Return: 5:00 PM (same day)<br>Duration: 9 hours`
+            : `Pickup: ${fmtDate(r.start_date)}, 8:00 AM<br>Return: ${fmtDate(r.end_date)}, 5:00 PM<br>Duration: ${r.days} days`}
+        </div>
+      </div>
+
+      <table class="inv-table">
+        <thead><tr><th>Item</th><th>Serial</th><th>Qty</th><th>Rate</th><th>Subtotal</th></tr></thead>
+        <tbody>${items}</tbody>
+        <tfoot>
+          <tr><td colspan="4" style="text-align:right">Equipment Subtotal</td><td>${ghc(subtotal)}</td></tr>
+          <tr><td colspan="4" style="text-align:right">Deposit</td><td>${ghc(deposit)}</td></tr>
+          <tr><td colspan="4" style="text-align:right">Amount Paid</td><td style="color:green">(${ghc(paid)})</td></tr>
+          <tr><td colspan="4" style="text-align:right;color:#E8520A;font-weight:800">BALANCE DUE</td><td style="color:#E8520A;font-size:1.1rem">${ghc(balance)}</td></tr>
+        </tfoot>
+      </table>
+
+      ${(r.payments||[]).length ? `
+      <div style="margin-top:12px;font-size:.8rem">
+        <strong>Payment History</strong>
+        <table class="inv-table" style="margin-top:6px">
+          <thead><tr><th>Date</th><th>Method</th><th>Reference</th><th>Amount</th></tr></thead>
+          <tbody>${(r.payments||[]).map(p=>`<tr><td>${fmtDate(p.paid_at)}</td><td>${p.method}</td><td>${p.reference||'—'}</td><td>${ghc(p.amount)}</td></tr>`).join('')}</tbody>
+        </table>
+      </div>` : ''}
+
+      <div class="inv-terms">
+        <h4 style="text-align:center">RENTAL AGREEMENT — TERMS &amp; CONDITIONS</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 18px">
+        ${[
+          ['IDENTIFICATION','A valid government ID is required for all rentals. For the integrity of our studio, first-time clients may be asked for additional verification.'],
+          ['SECURITY DEPOSIT','A refundable deposit is required for all equipment. It is returned promptly after a full quality inspection.'],
+          ['TIMELY RETURNS','Our equipment is reserved by creators who value precision. Please return all items on time to maintain our studio\'s standard of service. Late returns incur additional fees.'],
+          ['EQUIPMENT CARE','Each piece of gear is maintained to premium standards. Handle all items with the same care and respect you bring to your craft. Avoid exposure to water, dust, smoke, or hazardous environments unless approved.'],
+          ['RESPONSIBILITY FOR DAMAGE','Clients are fully responsible for any damage, loss, or theft during the rental period. Repair or replacement costs will be assessed with transparency and fairness.'],
+          ['EXCLUSIVE USE','Sub-renting or lending equipment to third parties is not permitted. All gear must remain with the original renter.'],
+          ['CLEAN & COMPLETE RETURNS','Please return all equipment in the condition it was provided — clean, complete, and ready for the next artist.'],
+          ['MEMORY & DATA','We do not store or back up footage. Memory cards must be returned empty unless purchased separately.'],
+          ['CANCELLATIONS','Cancellations made 24 hours in advance receive a full refund. Same-day cancellations may incur a fee.'],
+          ['EXTENSIONS','If you require additional time, please contact us before your rental period ends. Extensions are granted based on availability.'],
+        ].map(([t,b])=>`<div style="padding:6px 0;border-bottom:1px solid #eee"><div style="font-weight:700;font-size:.72rem;color:#111">${t}</div><div>${b}</div></div>`).join('')}
+        </div>
+        <div style="margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div style="border-top:1px solid #111;padding-top:6px">Client signature &amp; date</div>
+          <div style="border-top:1px solid #111;padding-top:6px">Authorised by Creative Rentals</div>
+        </div>
+        <p style="margin-top:14px;text-align:center;color:#888">RENT · CREATE · RETURN | Creative Rentals — Adum-Kumasi, Opposite Oyerepa FM &amp; Bosheba Building · 0241 334 486 / 024 816 4307 · creativerentals25@gmail.com</p>
+      </div>
+    </div>`;
+    openModal('modal-invoice');
+  } catch (err) { toast(err.message,'error'); }
+}
+
+function shareWhatsApp() {
+  if (!_invoiceRental) return;
+  const r = _invoiceRental;
+  const paid    = parseFloat(r.total_paid||0);
+  const subtotal= parseFloat(r.subtotal||0);
+  const deposit = parseFloat(r.deposit_amt||0);
+  const balance = subtotal + deposit - paid;
+
+  const items = (r.equipment||[]).map(e => `  • ${e.name} x${e.qty} @ ${ghc(e.unit_price)}${(r.days||1)>1?'/day':''}`).join('\n');
+  const text = `*CREATIVE RENTALS — Invoice #R-${String(r.id).padStart(4,'0')}*\n` +
+    `Adum-Kumasi, Opposite Oyerepa FM & Bosheba Building\n` +
+    `Tel: 0241 334 486 | 024 816 4307\n\n` +
+    `*Client:* ${r.client_name||'—'}\n` +
+    `*Period:* ${periodText(r)}${(!r.end_date||r.start_date===r.end_date)?' (9 hours)':' ('+r.days+' days)'}\n\n` +
+    `*Items:*\n${items}\n\n` +
+    `*Subtotal:* ${ghc(subtotal)}\n` +
+    `*Deposit:* ${ghc(deposit)}\n` +
+    `*Paid:* ${ghc(paid)}\n` +
+    `*Balance Due:* ${ghc(balance)}\n\n` +
+    `Thank you for choosing Creative Rentals! 🎥`;
+
+  let phone = (r.client_phone||'').replace(/[\s\-\(\)]/g,'');
+  if (phone.startsWith('0')) phone = '233'+phone.slice(1);
+  const url = phone
+    ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
+    : `https://wa.me/?text=${encodeURIComponent(text)}`;
+  window.open(url, '_blank');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Reports
+// ═══════════════════════════════════════════════════════════════════
+async function renderReports() {
+  document.getElementById('page-content').innerHTML = `
+    <h1 class="page-title">Reports</h1>
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-title mb-2">Filter</div>
+      <div class="input-row-3">
+        <div class="form-group"><label>From Date</label><input type="date" id="rpt-from"></div>
+        <div class="form-group"><label>To Date</label><input type="date" id="rpt-to" value="${today()}"></div>
+        <div class="form-group" style="align-self:end">
+          <button class="btn btn-primary w-full" onclick="loadReport()">Generate Report</button>
+        </div>
+      </div>
+      <div class="input-row">
+        <div class="form-group"><label>Filter by Client</label>
+          <select id="rpt-client"><option value="">All clients</option></select></div>
+        <div class="form-group"><label>Filter by Equipment</label>
+          <select id="rpt-equipment"><option value="">All equipment</option></select></div>
+      </div>
+    </div>
+    <div id="report-output" class="loading">Set filters and click Generate.</div>`;
+
+  // Populate filter dropdowns
+  const clients = _allClients.length ? _allClients : await GET('/api/clients');
+  _allClients = clients;
+  const eq = _allEquipment.length ? _allEquipment : await GET('/api/equipment');
+  _allEquipment = eq;
+
+  const cs = document.getElementById('rpt-client');
+  clients.forEach(c => cs.innerHTML += `<option value="${c.id}">${c.name}</option>`);
+  const es = document.getElementById('rpt-equipment');
+  eq.forEach(e => es.innerHTML += `<option value="${e.id}">${e.name} (${e.serial||'—'})</option>`);
+}
+
+async function loadReport() {
+  const params = new URLSearchParams();
+  const from = document.getElementById('rpt-from').value;
+  const to   = document.getElementById('rpt-to').value;
+  const cid  = document.getElementById('rpt-client').value;
+  const eid  = document.getElementById('rpt-equipment').value;
+  if (from) params.set('from', from);
+  if (to)   params.set('to', to);
+  if (cid)  params.set('client_id', cid);
+  if (eid)  params.set('equipment_id', eid);
+
+  document.getElementById('report-output').innerHTML = '<div class="loading">Generating…</div>';
+  try {
+    const data = await GET('/api/reports/summary?' + params.toString());
+    const s = data.summary;
+    let rentRows = (data.rentals||[]).map(r =>
+      `<tr><td>#R-${String(r.id).padStart(4,'0')}</td><td>${r.client_name}</td>
+       <td>${periodText(r)}</td>
+       <td>${statusBadge(r.status)}</td><td>${ghc(r.subtotal)}</td><td>${ghc((+r.subtotal)+(+r.deposit_amt)-(+r.total_paid))}</td></tr>`
+    ).join('');
+    let eqRows = (data.equipment||[]).map(e =>
+      `<tr><td>${e.name}</td><td>${e.serial||'—'}</td><td>${e.times_rented}</td><td>${ghc(e.revenue)}</td></tr>`
+    ).join('');
+
+    document.getElementById('report-output').innerHTML = `
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Total Rentals</div><div class="stat-value">${s.total_rentals}</div></div>
+        <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value text-accent">${s.active_rentals}</div></div>
+        <div class="stat-card"><div class="stat-label">Returned</div><div class="stat-value text-green">${s.returned_rentals}</div></div>
+        <div class="stat-card"><div class="stat-label">Overdue</div><div class="stat-value text-red">${s.overdue_rentals}</div></div>
+        <div class="stat-card"><div class="stat-label">Gross Revenue</div><div class="stat-value">${ghc(s.gross_revenue)}</div></div>
+        <div class="stat-card"><div class="stat-label">Collected</div><div class="stat-value text-green">${ghc(s.collected)}</div></div>
+        <div class="stat-card"><div class="stat-label">Outstanding</div><div class="stat-value text-red">${ghc(s.outstanding)}</div></div>
+      </div>
+      <div class="card mt-3">
+        <div class="card-title mb-2">Rentals</div>
+        <div class="table-wrap">
+          <table><thead><tr><th>ID</th><th>Client</th><th>Dates</th><th>Status</th><th>Total</th><th>Outstanding</th></tr></thead>
+          <tbody>${rentRows||'<tr><td colspan="6" class="empty">No rentals in range</td></tr>'}</tbody></table>
+        </div>
+      </div>
+      ${eqRows ? `<div class="card mt-3">
+        <div class="card-title mb-2">Equipment Usage</div>
+        <div class="table-wrap">
+          <table><thead><tr><th>Name</th><th>Serial</th><th>Times Rented</th><th>Revenue</th></tr></thead>
+          <tbody>${eqRows}</tbody></table>
+        </div>
+      </div>` : ''}`;
+  } catch (err) {
+    document.getElementById('report-output').innerHTML = `<div class="empty text-red">${err.message}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Users  (admin only)
+// ═══════════════════════════════════════════════════════════════════
+let _userEdit = null, _allUsers = [];
+
+async function renderUsers() {
+  if (!isAdmin()) { navigate('dashboard'); return; }
+  const action = document.getElementById('topbar-action');
+  action.textContent = '+ New User'; action.style.display = 'flex';
+  action.onclick = () => openUserModal(null);
+
+  try {
+    const users = await GET('/api/users');
+    let rows = '';
+    _allUsers = users;
+    users.forEach(u => {
+      const self = u.id === _currentUser.id;
+      rows += `<tr>
+        <td>${u.name}${self?' <span class="text-dim" style="font-size:.75rem">(you)</span>':''}</td>
+        <td>${u.username}</td>
+        <td><span class="badge badge-${u.role}">${ROLE_LABEL[u.role]||u.role}</span></td>
+        <td><span class="badge ${u.active?'badge-active':'badge-cancelled'}">${u.active?'Active':'Inactive'}</span></td>
+        <td>${fmtDate(u.created_at)}</td>
+        <td>
+          ${u.can_manage ? `<div class="flex gap-2">
+            <button class="btn-icon btn-sm" title="Edit" onclick="openUserModal(${u.id})">✏️</button>
+            ${!self?`<button class="btn-icon btn-sm" title="${u.active?'Disable':'Enable'}" onclick="toggleUser(${u.id},${!u.active})">${u.active?'🔒':'🔓'}</button>`:''}
+            ${!self?`<button class="btn-icon btn-sm" title="Delete" onclick="deleteUser(${u.id},'${u.username}')">🗑️</button>`:''}
+          </div>` : `<span class="text-dim" style="font-size:.75rem">🔒 Super Admin only</span>`}
+        </td>
+      </tr>`;
+    });
+    document.getElementById('page-content').innerHTML = `
+      <h1 class="page-title">Users</h1>
+      <p class="text-dim" style="font-size:.88rem;margin:-8px 0 16px">${isSuperAdmin()
+        ? 'As Super Admin you can add, edit, disable and remove all accounts, including admins.'
+        : 'You can manage staff accounts. Admin accounts are controlled by the Super Admin.'}</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th>Created</th><th></th></tr></thead>
+          <tbody>${rows||'<tr><td colspan="6" class="empty">No users</td></tr>'}</tbody>
+        </table>
+      </div>`;
+  } catch (err) { document.getElementById('page-content').innerHTML = `<div class="empty text-red">${err.message}</div>`; }
+}
+
+async function openUserModal(id) {
+  _userEdit = id;
+  document.getElementById('modal-user-title').textContent = id ? 'Edit User' : 'Add User';
+  ['name','username','password'].forEach(f => document.getElementById('usr-'+f).value = '');
+  const u = id ? (_allUsers.find(x=>x.id===id) || (await GET('/api/users')).find(x=>x.id===id)) : null;
+  const self = u && u.id === _currentUser.id;
+  const sel = document.getElementById('usr-role');
+  const roles = self ? [u.role] : (isSuperAdmin() ? ['staff','admin','superadmin'] : ['staff']);
+  sel.innerHTML = roles.map(r => `<option value="${r}">${ROLE_LABEL[r]}</option>`).join('');
+  sel.disabled = !!self;
+  document.getElementById('usr-role-note').textContent = self ? 'You cannot change your own role.'
+    : isSuperAdmin() ? 'Super Admins control all accounts. Admins can manage staff only.'
+    : 'Only the Super Admin can create admins.';
+  document.getElementById('usr-username').disabled = !!u;
+  sel.value = u ? u.role : 'staff';
+  if (u) {
+    document.getElementById('usr-name').value     = u.name;
+    document.getElementById('usr-username').value = u.username;
+  }
+  openModal('modal-user');
+}
+
+async function saveUser() {
+  const body = {
+    name:     document.getElementById('usr-name').value.trim(),
+    username: document.getElementById('usr-username').value.trim(),
+    role:     document.getElementById('usr-role').value
+  };
+  const pw = document.getElementById('usr-password').value;
+  if (!_userEdit && !pw) { toast('Password required','error'); return; }
+  if (pw) body.password = pw;
+  if (!body.name || !body.username) { toast('Name and username required','error'); return; }
+
+  try {
+    if (_userEdit) {
+      if (_userEdit === _currentUser.id) delete body.role;
+      delete body.username;
+      const updated = await PATCH('/api/users/'+_userEdit, body);
+      if (_userEdit === _currentUser.id) {
+        _currentUser.name = updated.name; localStorage.setItem('cr_user', JSON.stringify(_currentUser));
+        document.getElementById('user-name-display').textContent = updated.name;
+      }
+    } else await POST('/api/users', body);
+    closeModal('modal-user');
+    toast('User saved');
+    renderUsers();
+  } catch (err) { toast(err.message,'error'); }
+}
+
+async function toggleUser(id, active) {
+  try {
+    await PATCH('/api/users/'+id, { active });
+    toast(active ? 'User activated' : 'User deactivated');
+    renderUsers();
+  } catch (err) { toast(err.message,'error'); }
+}
+
+async function deleteUser(id, username) {
+  if (!confirm(`Delete user "${username}"?`)) return;
+  try {
+    await DELETE('/api/users/'+id);
+    toast('User deleted');
+    renderUsers();
+  } catch (err) { toast(err.message,'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Settings — admin only (clear data)
+// ═══════════════════════════════════════════════════════════════════
+let _clearKind = null, _counts = null;
+const CLEAR_INFO = {
+  equipment: { word:'EQUIPMENT', title:'Clear all equipment',
+    desc: c => `Removes all <strong>${c.equipment}</strong> equipment items from the list. Past rentals, invoices and reports keep their item names and serial numbers.` },
+  clients:   { word:'CLIENTS',   title:'Clear all clients',
+    desc: c => `Removes all <strong>${c.clients}</strong> clients <strong>and all ${c.rentals} rentals</strong> with their payments, because every rental belongs to a client. All equipment becomes available again.` },
+  rentals:   { word:'RENTALS',   title:'Clear all rentals',
+    desc: c => `Removes all <strong>${c.rentals}</strong> rentals and their <strong>${c.payments}</strong> payments. Clients and equipment are kept, and all equipment becomes available again.` },
+  all:       { word:'EVERYTHING', title:'Clear everything',
+    desc: c => `Removes all <strong>${c.equipment}</strong> equipment items, <strong>${c.clients}</strong> clients, <strong>${c.rentals}</strong> rentals and <strong>${c.payments}</strong> payments. User accounts are kept so you can still log in.` },
+  payments:  { word:'PAYMENTS',  title:'Clear all payments',
+    desc: c => `Removes all <strong>${c.payments}</strong> recorded payments. Rentals are kept, but every rental will show as unpaid.` }
+};
+
+async function renderSettings() {
+  if (!isSuperAdmin()) { navigate('dashboard'); return; }
+  try {
+    _counts = await GET('/api/admin/counts');
+    const c = _counts;
+    document.getElementById('page-content').innerHTML = `
+      <h1 class="page-title">Settings</h1>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Equipment</div><div class="stat-value">${c.equipment}</div></div>
+        <div class="stat-card"><div class="stat-label">Clients</div><div class="stat-value">${c.clients}</div></div>
+        <div class="stat-card"><div class="stat-label">Rentals</div><div class="stat-value">${c.rentals}</div></div>
+        <div class="stat-card"><div class="stat-label">Payments</div><div class="stat-value">${c.payments}</div></div>
+      </div>
+      <div class="card" style="border-color:#7f1d1d;max-width:760px">
+        <div class="card-header"><span class="card-title" style="color:var(--red)">⚠ Danger zone</span></div>
+        <p class="text-dim" style="font-size:.88rem;margin-bottom:16px">Permanently delete records for everyone using the app. Only the Super Admin can see this. You'll need to type a confirmation word and your password.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px">
+          <button class="btn btn-danger" style="justify-content:center" onclick="openClear('equipment')">🎬 Clear all equipment</button>
+          <button class="btn btn-danger" style="justify-content:center" onclick="openClear('clients')">👥 Clear all clients</button>
+          <button class="btn btn-danger" style="justify-content:center" onclick="openClear('rentals')">📦 Clear all rentals</button>
+          <button class="btn btn-danger" style="justify-content:center" onclick="openClear('payments')">💳 Clear all payments</button>
+        </div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+          <button class="btn btn-danger" onclick="openClear('all')">🗑 Clear everything (equipment, clients, rentals &amp; payments)</button>
+        </div>
+        ${c.rentals_out ? `<p class="text-dim" style="font-size:.8rem;margin-top:12px">Note: ${c.rentals_out} rental(s) are still out — equipment can't be cleared until they're marked Returned.</p>` : ''}
+      </div>`;
+  } catch (err) { document.getElementById('page-content').innerHTML = `<div class="empty text-red">${err.message}</div>`; }
+}
+
+function openClear(kind) {
+  _clearKind = kind;
+  const info = CLEAR_INFO[kind];
+  document.getElementById('clr-title').textContent = info.title;
+  document.getElementById('clr-desc').innerHTML = info.desc(_counts);
+  document.getElementById('clr-word-label').textContent = info.word;
+  document.getElementById('clr-word').value = '';
+  document.getElementById('clr-word').placeholder = info.word;
+  document.getElementById('clr-pass').value = '';
+  openModal('modal-clear');
+}
+
+async function doClear() {
+  const btn = document.getElementById('clr-btn');
+  btn.disabled = true; btn.textContent = 'Clearing…';
+  try {
+    const r = await POST('/api/admin/clear', {
+      target: _clearKind,
+      confirm: document.getElementById('clr-word').value,
+      password: document.getElementById('clr-pass').value
+    });
+    closeModal('modal-clear');
+    toast(r.message);
+    _allEquipment = []; _allClients = []; _allRentals = [];
+    renderSettings();
+  } catch (err) { toast(err.message, 'error'); }
+  btn.disabled = false; btn.textContent = 'Clear permanently';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Bootstrap
+// ═══════════════════════════════════════════════════════════════════
+(async function init() {
+  // Date inputs: calc days on change
+  document.getElementById('rnt-start').addEventListener('change', calcRentalTotal);
+  document.getElementById('rnt-end').addEventListener('change', calcRentalTotal);
+
+  if (_token) {
+    await bootApp();
+  }
+})();
+</script>
+</body>
+</html>
