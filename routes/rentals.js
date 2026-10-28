@@ -8,9 +8,12 @@ router.use(requireAuth);
 async function enrichRental(row, client) {
   const q = client || db;
   const { rows: items } = await q.query(
-    `SELECT re.*, e.name, e.serial, e.category
+    `SELECT re.*, e.name, e.serial, e.category,
+            (p.equipment_id IS NOT NULL) AS has_photo,
+            COALESCE(FLOOR(EXTRACT(EPOCH FROM p.updated_at))::bigint, 0) AS photo_v
      FROM rental_equipment re
      JOIN equipment e ON e.id = re.equipment_id
+     LEFT JOIN equipment_photos p ON p.equipment_id = e.id
      WHERE re.rental_id = $1`, [row.id]
   );
   const { rows: payments } = await q.query(
