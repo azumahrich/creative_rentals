@@ -2,7 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1a1a2e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Creative Rentals">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/png" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <title>Creative Rentals</title>
 <style>
 /* ─── CSS Variables ─────────────────────────────────── */
@@ -26,9 +34,11 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--primary);color
 /* ─── Layout ────────────────────────────────────────── */
 #app{display:none;flex-direction:row;min-height:100vh}
 #sidebar{width:var(--sidebar-w);background:var(--primary-light);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;overflow-y:auto}
-#main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh}
+#main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0}   /* min-width:0 stops wide rows (e.g. category chips) stretching the page on phones */
 #topbar{height:var(--header-h);background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:50}
-#page-content{flex:1;padding:24px}
+#page-content{flex:1;padding:24px;min-width:0}
+.chips{max-width:100%}
+.chip{flex-shrink:0}
 
 /* ─── Sidebar ───────────────────────────────────────── */
 .sidebar-logo{padding:20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
@@ -147,14 +157,93 @@ tr:hover td{background:rgba(255,255,255,.025)}
 .mt-2{margin-top:8px}.mt-3{margin-top:12px}.mb-2{margin-bottom:8px}
 .flex{display:flex}.gap-2{gap:8px}.items-center{align-items:center}.justify-between{justify-content:space-between}
 .w-full{width:100%}
-@media(max-width:640px){
-  #sidebar{transform:translateX(-100%);transition:.3s}
-  #sidebar.open{transform:translateX(0)}
+/* ─── Category chips & filters ─────────────────────── */
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.chip{padding:7px 14px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--text-dim);font-size:.84rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:.15s}
+.chip:hover{border-color:var(--accent);color:var(--text)}
+.chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip .n{opacity:.75;margin-left:5px;font-size:.75rem;font-weight:500}
+.result-note{font-size:.8rem;color:var(--text-dim);margin:-4px 0 12px}
+.eq-pick{display:grid;grid-template-columns:150px 1fr 74px auto;gap:8px;align-items:center}
+
+/* ─── Slide-out menu (tablets & phones) ────────────── */
+#menu-btn{display:none}
+#sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:95}
+@media(max-width:1024px){
+  #sidebar{transform:translateX(-100%);transition:transform .25s ease;z-index:100;box-shadow:4px 0 24px rgba(0,0,0,.4)}
+  #sidebar.open{transform:none}
+  body.sidebar-open #sidebar-overlay{display:block}
+  body.sidebar-open{overflow:hidden}
   #main{margin-left:0}
-  #topbar{padding:0 14px}
-  #page-content{padding:14px}
-  .input-row,.input-row-3{grid-template-columns:1fr}
-  .stat-grid{grid-template-columns:1fr 1fr}
+  #menu-btn{display:inline-flex;align-items:center;justify-content:center;min-width:40px;min-height:40px}
+  #topbar{gap:10px}
+  .stat-grid{grid-template-columns:repeat(3,1fr)}
+}
+
+/* ─── Tables become cards on phones & portrait tablets ─ */
+@media(max-width:900px){
+  .table-wrap{border:none;overflow:visible;border-radius:0}
+  .table-wrap table,.table-wrap tbody,.table-wrap tr,.table-wrap td{display:block;width:100%}
+  .table-wrap thead{display:none}
+  .table-wrap tr{background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;padding:4px 14px}
+  .table-wrap td{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--border);padding:9px 0;text-align:right;min-height:40px}
+  .table-wrap td:first-child{border-top:none;font-weight:700;font-size:.95rem}
+  .table-wrap td::before{content:attr(data-label);color:var(--text-dim);font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;text-align:left;flex-shrink:0}
+  .table-wrap td[data-label=""]::before,.table-wrap td:not([data-label])::before{content:none}
+  .table-wrap td[data-label=""]{justify-content:flex-end}
+  .table-wrap td.empty{display:block;text-align:center;border:none}
+  .table-wrap tr:hover td{background:none}
+
+  .table-wrap td .flex{flex-wrap:wrap;justify-content:flex-end}
+}
+/* portrait tablets: two cards per row */
+@media(min-width:641px) and (max-width:900px){
+  .table-wrap tbody{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .table-wrap tr{margin-bottom:0}
+  .table-wrap tr:has(td.empty){grid-column:1/-1}
+}
+
+/* ─── Phones ───────────────────────────────────────── */
+@media(max-width:640px){
+  input,select,textarea{font-size:16px}           /* stops iPhone zooming into fields */
+  #topbar{padding:0 12px;padding-top:env(safe-area-inset-top);height:calc(var(--header-h) + env(safe-area-inset-top))}
+  #topbar-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #page-content{padding:12px 12px calc(16px + env(safe-area-inset-bottom))}
+  .page-title{font-size:1.2rem;margin-bottom:14px}
+  .stat-grid{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+  .stat-card{padding:12px 14px}
+  .stat-value{font-size:1.2rem;word-break:break-word}
+  .card{padding:14px}
+  .card-header{flex-wrap:wrap;gap:8px}
+  .input-row,.input-row-3{grid-template-columns:1fr;gap:0}
+  .toolbar > *{flex:1 1 100%;width:100% !important}
+  .chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;margin-left:-12px;margin-right:-12px;padding-left:12px;padding-right:12px;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{padding:8px 14px}
+  .eq-pick{grid-template-columns:1fr 70px auto;padding:10px;border:1px solid var(--border);border-radius:10px}
+  .eq-pick .eq-cat{grid-column:1/-1}
+  .btn{min-height:40px}
+  .btn-sm{min-height:34px}
+  .btn-icon{min-width:40px;min-height:40px;display:inline-flex;align-items:center;justify-content:center}
+
+  /* dialogs slide up from the bottom, full width */
+  .modal-overlay{padding:0;align-items:flex-end}
+  .modal,.modal-lg{max-width:100%;width:100%;max-height:92vh;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+  .modal-footer{flex-wrap:wrap}
+  .modal-footer .btn{flex:1 1 40%;justify-content:center}
+
+  /* invoice */
+  .invoice-wrap{padding:16px;font-size:.8rem}
+  .invoice-header{flex-direction:column;gap:12px}
+  .invoice-title{text-align:left}
+  .invoice-logo{width:170px}
+  .invoice-wrap > div[style*="grid-template-columns:1fr 1fr"],
+  .inv-terms > div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr !important}
+  .inv-table{display:block;overflow-x:auto;white-space:nowrap}
+
+  #toast{left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom))}
+  .toast-msg{max-width:none}
+  .auth-box{padding:28px 20px}
 }
 </style>
 </head>
@@ -237,10 +326,12 @@ tr:hover td{background:rgba(255,255,255,.025)}
     </div>
   </nav>
 
+  <div id="sidebar-overlay" onclick="closeSidebar()"></div>
+
   <!-- Main -->
   <div id="main">
     <header id="topbar">
-      <button class="btn-icon" id="menu-btn" onclick="toggleSidebar()" style="display:none">
+      <button class="btn-icon" id="menu-btn" onclick="toggleSidebar()" aria-label="Menu">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
       <span id="topbar-title" style="font-weight:700;font-size:1rem">Dashboard</span>
@@ -332,7 +423,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
       <div class="form-group"><label>Return</label><input value="5:00 PM" disabled></div>
     </div>
     <div class="form-group">
-      <label>Equipment</label>
+      <label>Equipment <span class="text-dim">— choose a category, then the item</span></label>
       <div id="rnt-eq-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
       <button class="btn btn-secondary btn-sm" onclick="addEquipmentRow()">+ Add Item</button>
     </div>
@@ -519,11 +610,6 @@ async function bootApp() {
     document.getElementById('nav-settings').style.display = isSuperAdmin() ? 'flex' : 'none';
   }
 
-  // Mobile menu button
-  if (window.innerWidth <= 640) {
-    document.getElementById('menu-btn').style.display = 'flex';
-  }
-
   navigate('dashboard');
 }
 
@@ -539,6 +625,7 @@ let _page = 'dashboard';
 function navigate(page) {
   if (!PAGES[page]) return;
   _page = page;
+  closeSidebar();
   document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === page));
   const titles = { dashboard:'Dashboard', rentals:'Rentals', clients:'Clients',
                    equipment:'Equipment', payments:'Payments', reports:'Reports', users:'Users', settings:'Settings' };
@@ -550,8 +637,37 @@ function navigate(page) {
 }
 
 function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('open');
+  const open = document.getElementById('sidebar').classList.toggle('open');
+  document.body.classList.toggle('sidebar-open', open);
 }
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.body.classList.remove('sidebar-open');
+}
+window.addEventListener('resize', () => { if (window.innerWidth > 1024) closeSidebar(); });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  closeSidebar();
+  document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+});
+
+// On phones every table is shown as cards: label each cell with its column heading
+function labelTables(root) {
+  (root || document).querySelectorAll('.table-wrap table').forEach(t => {
+    const heads = [...t.querySelectorAll('thead th')].map(th => th.textContent.trim());
+    t.querySelectorAll('tbody tr').forEach(tr => {
+      const cells = [...tr.children];
+      if (cells.length === 1 && cells[0].hasAttribute('colspan')) return;
+      cells.forEach((td, i) => { const l = heads[i] || ''; if (td.dataset.label !== l) td.dataset.label = l; });
+    });
+  });
+}
+let _labelQueued = false;
+new MutationObserver(() => {
+  if (_labelQueued) return;
+  _labelQueued = true;
+  requestAnimationFrame(() => { _labelQueued = false; labelTables(document.getElementById('page-content')); });
+}).observe(document.getElementById('page-content'), { childList: true, subtree: true });
 
 // ═══════════════════════════════════════════════════════════════════
 //  Helpers
@@ -757,6 +873,8 @@ async function deleteClient(id, name) {
 // ═══════════════════════════════════════════════════════════════════
 let _eqEdit = null, _allEquipment = [];
 
+let _eqCat = 'All', _eqSearch = '';
+
 async function renderEquipment() {
   const action = document.getElementById('topbar-action');
   if (isAdmin()) {
@@ -766,31 +884,53 @@ async function renderEquipment() {
 
   try {
     _allEquipment = await GET('/api/equipment');
-    let rows = '';
-    _allEquipment.forEach(e => {
-      rows += `<tr>
-        <td>${e.serial||'—'}</td>
+    const cats = [...new Set(_allEquipment.map(e => e.category))].sort();
+    if (_eqCat !== 'All' && !cats.includes(_eqCat)) _eqCat = 'All';
+    document.getElementById('page-content').innerHTML = `
+      <h1 class="page-title">Equipment</h1>
+      <div class="toolbar">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input id="eq-search" placeholder="Search name or serial number…" value="${_eqSearch.replace(/"/g,'&quot;')}" oninput="_eqSearch=this.value; drawEquipment()">
+        </div>
+      </div>
+      <div class="chips" id="eq-chips"></div>
+      <div class="result-note" id="eq-note"></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Serial</th><th>Category</th><th>Rate/day (8am–5pm)</th><th>Deposit</th><th>Available</th><th></th></tr></thead>
+          <tbody id="eq-tbody"></tbody>
+        </table>
+      </div>`;
+    drawEquipment();
+  } catch (err) { document.getElementById('page-content').innerHTML = `<div class="empty text-red">${err.message}</div>`; }
+}
+
+function setEqCat(c) { _eqCat = c; drawEquipment(); }
+
+function drawEquipment() {
+  const q = _eqSearch.trim().toLowerCase();
+  const bySearch = _allEquipment.filter(e => !q || (e.name||'').toLowerCase().includes(q) || (e.serial||'').toLowerCase().includes(q));
+  const cats = [...new Set(_allEquipment.map(e => e.category))].sort();
+  const count = c => bySearch.filter(e => c === 'All' || e.category === c).length;
+  const esc = s => String(s).replace(/'/g, "\\'");
+  document.getElementById('eq-chips').innerHTML = ['All', ...cats].map(c =>
+    `<button class="chip${_eqCat===c?' active':''}" onclick="setEqCat('${esc(c)}')">${c}<span class="n">${count(c)}</span></button>`).join('');
+  const list = bySearch.filter(e => _eqCat === 'All' || e.category === _eqCat);
+  document.getElementById('eq-note').textContent =
+    list.length === _allEquipment.length ? `${list.length} items` : `Showing ${list.length} of ${_allEquipment.length} items`;
+  document.getElementById('eq-tbody').innerHTML = list.map(e => `<tr>
         <td>${e.name}</td>
+        <td>${e.serial||'—'}</td>
         <td>${e.category}</td>
         <td>${ghc(e.price)}/day</td>
         <td>${ghc(e.deposit)}</td>
         <td><span class="badge ${e.available>0?'badge-active':'badge-overdue'}">${e.available}/${e.total}</span></td>
         ${isAdmin()?`<td><div class="flex gap-2">
-          <button class="btn-icon btn-sm" onclick="openEqModal(${e.id})">✏️</button>
-          <button class="btn-icon btn-sm" onclick="deleteEq(${e.id},'${e.name.replace(/'/g,"\\'")}')">🗑️</button>
+          <button class="btn-icon btn-sm" title="Edit" onclick="openEqModal(${e.id})">✏️</button>
+          <button class="btn-icon btn-sm" title="Delete" onclick="deleteEq(${e.id},'${e.name.replace(/'/g,"\\'")}')">🗑️</button>
         </div></td>`:'<td></td>'}
-      </tr>`;
-    });
-
-    document.getElementById('page-content').innerHTML = `
-      <h1 class="page-title">Equipment</h1>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Serial</th><th>Name</th><th>Category</th><th>Rate/day (8am–5pm)</th><th>Deposit</th><th>Available</th><th></th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="7" class="empty">No equipment yet</td></tr>'}</tbody>
-        </table>
-      </div>`;
-  } catch (err) { document.getElementById('page-content').innerHTML = `<div class="empty text-red">${err.message}</div>`; }
+      </tr>`).join('') || `<tr><td colspan="7" class="empty">${_allEquipment.length ? 'No equipment matches this filter' : 'No equipment yet'}</td></tr>`;
 }
 
 async function openEqModal(id) {
@@ -942,22 +1082,50 @@ async function openRentalModal() {
   openModal('modal-rental');
 }
 
-function addEquipmentRow() {
-  const id = Date.now();
-  _eqRows.push(id);
-  const opts = _allEquipment.map(e =>
-    `<option value="${e.id}" data-price="${e.price}" data-deposit="${e.deposit}" data-avail="${e.available}">${e.name} (${ghc(e.price)}/day)</option>`
-  ).join('');
+function eqOptions(cat) {
+  return _allEquipment.filter(e => !cat || e.category === cat).map(e =>
+    `<option value="${e.id}" data-price="${e.price}" data-deposit="${e.deposit}" data-avail="${e.available}"${e.available>0?'':' disabled'}>${e.name} — ${ghc(e.price)}/day${e.available>0?` · ${e.available} left`:' · none left'}</option>`
+  ).join('') || '<option value="" disabled>No items in this category</option>';
+}
 
+function addEquipmentRow() {
+  const id = Date.now() + Math.floor(Math.random()*1000);
+  _eqRows.push(id);
+  const cats = [...new Set(_allEquipment.map(e => e.category))].sort();
   const div = document.createElement('div');
   div.id = 'eq-row-'+id;
-  div.style.cssText = 'display:grid;grid-template-columns:1fr 80px auto;gap:8px;align-items:center';
+  div.className = 'eq-pick';
   div.innerHTML = `
-    <select onchange="calcRentalTotal()">${opts}</select>
-    <input type="number" min="1" value="1" placeholder="Qty" style="width:100%" oninput="calcRentalTotal()">
-    <button class="btn-icon" onclick="removeEqRow('${id}')">✕</button>`;
+    <select class="eq-cat" onchange="pickEqCat(this)" aria-label="Category">
+      <option value="">All categories</option>${cats.map(c => `<option>${c}</option>`).join('')}
+    </select>
+    <select class="eq-item" onchange="syncQtyMax(this); calcRentalTotal()" aria-label="Equipment">${eqOptions('')}</select>
+    <input class="eq-qty" type="number" min="1" value="1" placeholder="Qty" aria-label="Quantity" oninput="calcRentalTotal()">
+    <button class="btn-icon" title="Remove" onclick="removeEqRow('${id}')">✕</button>`;
   document.getElementById('rnt-eq-list').appendChild(div);
+  const item = div.querySelector('.eq-item');
+  const firstFree = [...item.options].find(o => !o.disabled);
+  if (firstFree) item.value = firstFree.value;
+  syncQtyMax(item);
   calcRentalTotal();
+}
+
+function pickEqCat(sel) {
+  const item = sel.parentElement.querySelector('.eq-item');
+  item.innerHTML = eqOptions(sel.value);
+  const firstFree = [...item.options].find(o => !o.disabled);
+  if (firstFree) item.value = firstFree.value;
+  syncQtyMax(item);
+  calcRentalTotal();
+}
+
+// Quantity can't exceed how many of that item are available
+function syncQtyMax(itemSel) {
+  const opt = itemSel.selectedOptions[0];
+  const qty = itemSel.parentElement.querySelector('.eq-qty');
+  const avail = opt ? parseInt(opt.dataset.avail) || 0 : 0;
+  qty.max = Math.max(1, avail);
+  if ((parseInt(qty.value) || 1) > avail && avail > 0) qty.value = avail;
 }
 
 function removeEqRow(id) {
@@ -972,10 +1140,11 @@ function calcRentalTotal() {
   if (start) { endEl.min = start; if (!endEl.value || endEl.value < start) endEl.value = start; }
   const days = rentalDays(start, endEl.value);
   let subtotal=0, deposit=0;
-  document.querySelectorAll('#rnt-eq-list > div').forEach(row => {
-    const sel = row.querySelector('select');
-    const qty = parseInt(row.querySelector('input').value)||1;
+  document.querySelectorAll('#rnt-eq-list > .eq-pick').forEach(row => {
+    const sel = row.querySelector('.eq-item');
+    const qty = parseInt(row.querySelector('.eq-qty').value)||1;
     const opt = sel.selectedOptions[0];
+    if (!opt || !opt.value) return;
     const price   = parseFloat(opt.dataset.price)||0;
     const dep     = parseFloat(opt.dataset.deposit)||0;
     subtotal += price * qty * days;
@@ -993,10 +1162,11 @@ async function saveRental() {
   if (!rental_date) { toast('Rental date required','error'); return; }
   if (return_date < rental_date) { toast('Return date cannot be before the rental date','error'); return; }
   const equipment = [];
-  document.querySelectorAll('#rnt-eq-list > div').forEach(row => {
-    const sel = row.querySelector('select');
-    const qty = parseInt(row.querySelector('input').value)||1;
+  document.querySelectorAll('#rnt-eq-list > .eq-pick').forEach(row => {
+    const sel = row.querySelector('.eq-item');
+    const qty = parseInt(row.querySelector('.eq-qty').value)||1;
     const opt = sel.selectedOptions[0];
+    if (!opt || !opt.value) return;
     equipment.push({
       equipment_id: parseInt(sel.value),
       qty,
@@ -1005,6 +1175,13 @@ async function saveRental() {
     });
   });
   if (!equipment.length) { toast('Add at least one equipment item','error'); return; }
+  // Check stock, adding up rows that pick the same item
+  const wanted = {};
+  equipment.forEach(e => { wanted[e.equipment_id] = (wanted[e.equipment_id] || 0) + e.qty; });
+  for (const [id, n] of Object.entries(wanted)) {
+    const eq = _allEquipment.find(x => x.id == id);
+    if (eq && n > eq.available) { toast(`Only ${eq.available} × ${eq.name} available`, 'error'); return; }
+  }
 
   try {
     await POST('/api/rentals', {
@@ -1442,6 +1619,7 @@ const CLEAR_INFO = {
     desc: c => `Removes all <strong>${c.rentals}</strong> rentals and their <strong>${c.payments}</strong> payments. Clients and equipment are kept, and all equipment becomes available again.` },
   all:       { word:'EVERYTHING', title:'Clear everything',
     desc: c => `Removes all <strong>${c.equipment}</strong> equipment items, <strong>${c.clients}</strong> clients, <strong>${c.rentals}</strong> rentals and <strong>${c.payments}</strong> payments. User accounts are kept so you can still log in.` },
+  import:    { word:'IMPORT',    title:'Import offline backup', desc: () => '' },
   payments:  { word:'PAYMENTS',  title:'Clear all payments',
     desc: c => `Removes all <strong>${c.payments}</strong> recorded payments. Rentals are kept, but every rental will show as unpaid.` }
 };
@@ -1458,6 +1636,16 @@ async function renderSettings() {
         <div class="stat-card"><div class="stat-label">Clients</div><div class="stat-value">${c.clients}</div></div>
         <div class="stat-card"><div class="stat-label">Rentals</div><div class="stat-value">${c.rentals}</div></div>
         <div class="stat-card"><div class="stat-label">Payments</div><div class="stat-value">${c.payments}</div></div>
+      </div>
+      <div class="card" style="max-width:760px;margin-bottom:20px">
+        <div class="card-header"><span class="card-title">⬆ Import from the offline app</span></div>
+        <p class="text-dim" style="font-size:.88rem;margin-bottom:14px;line-height:1.5">
+          Bring in your records from the offline <strong>CreativeRentals_final.html</strong>. In the offline app go to
+          <strong>Settings &amp; Data → Export backup</strong>, then choose that <strong>.json</strong> file here.
+          This <strong>replaces</strong> all equipment, clients, rentals and payments online. User accounts are kept.
+        </p>
+        <input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="readImportFile(this)">
+        <button class="btn btn-secondary" onclick="document.getElementById('import-file').click()">📂 Choose backup file…</button>
       </div>
       <div class="card" style="border-color:#7f1d1d;max-width:760px">
         <div class="card-header"><span class="card-title" style="color:var(--red)">⚠ Danger zone</span></div>
@@ -1476,8 +1664,35 @@ async function renderSettings() {
   } catch (err) { document.getElementById('page-content').innerHTML = `<div class="empty text-red">${err.message}</div>`; }
 }
 
+// ── Import offline backup ──
+let _importBackup = null;
+function readImportFile(input) {
+  const file = input.files[0]; input.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    let d;
+    try { d = JSON.parse(ev.target.result); } catch { toast('That file is not a valid backup (.json) file', 'error'); return; }
+    if (!d || !Array.isArray(d.clients) || !Array.isArray(d.rentals) || !Array.isArray(d.equipment)) {
+      toast('This is not a Creative Rentals offline backup file', 'error'); return;
+    }
+    _importBackup = d;
+    const pay = d.rentals.reduce((s, r) => s + ((r && r.payments) || []).length, 0);
+    CLEAR_INFO.import.desc = () =>
+      `Backup from <strong>${d.exportedAt ? fmtDate(d.exportedAt.slice(0,10)) : 'unknown date'}</strong>${d.label ? ' ('+String(d.label).replace(/</g,'&lt;')+')' : ''} contains
+       <strong>${d.equipment.length}</strong> equipment, <strong>${d.clients.length}</strong> clients,
+       <strong>${d.rentals.length}</strong> rentals and <strong>${pay}</strong> payments.<br><br>
+       Importing will <strong>replace</strong> everything currently online
+       (${_counts.equipment} equipment, ${_counts.clients} clients, ${_counts.rentals} rentals, ${_counts.payments} payments).
+       Pending rentals from the offline app come in as Active. User accounts are not affected.`;
+    openClear('import');
+  };
+  reader.readAsText(file);
+}
+
 function openClear(kind) {
   _clearKind = kind;
+  document.getElementById('clr-btn').textContent = kind === 'import' ? 'Import now' : 'Clear permanently';
   const info = CLEAR_INFO[kind];
   document.getElementById('clr-title').textContent = info.title;
   document.getElementById('clr-desc').innerHTML = info.desc(_counts);
@@ -1490,19 +1705,27 @@ function openClear(kind) {
 
 async function doClear() {
   const btn = document.getElementById('clr-btn');
-  btn.disabled = true; btn.textContent = 'Clearing…';
+  const importing = _clearKind === 'import';
+  btn.disabled = true; btn.textContent = importing ? 'Importing…' : 'Clearing…';
   try {
-    const r = await POST('/api/admin/clear', {
-      target: _clearKind,
-      confirm: document.getElementById('clr-word').value,
-      password: document.getElementById('clr-pass').value
-    });
+    const r = importing
+      ? await POST('/api/admin/import', {
+          confirm: document.getElementById('clr-word').value,
+          password: document.getElementById('clr-pass').value,
+          backup: _importBackup
+        })
+      : await POST('/api/admin/clear', {
+          target: _clearKind,
+          confirm: document.getElementById('clr-word').value,
+          password: document.getElementById('clr-pass').value
+        });
+    if (importing) _importBackup = null;
     closeModal('modal-clear');
     toast(r.message);
     _allEquipment = []; _allClients = []; _allRentals = [];
     renderSettings();
   } catch (err) { toast(err.message, 'error'); }
-  btn.disabled = false; btn.textContent = 'Clear permanently';
+  btn.disabled = false; btn.textContent = importing ? 'Import now' : 'Clear permanently';
 }
 
 // ═══════════════════════════════════════════════════════════════════
