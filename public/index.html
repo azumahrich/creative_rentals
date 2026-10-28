@@ -164,7 +164,23 @@ tr:hover td{background:rgba(255,255,255,.025)}
 .chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
 .chip .n{opacity:.75;margin-left:5px;font-size:.75rem;font-weight:500}
 .result-note{font-size:.8rem;color:var(--text-dim);margin:-4px 0 12px}
-.eq-pick{display:grid;grid-template-columns:150px 1fr 74px auto;gap:8px;align-items:center}
+.eq-pick{display:grid;grid-template-columns:40px 150px 1fr 74px auto;gap:8px;align-items:center}
+
+/* ─── Equipment photos ─────────────────────────────── */
+.eq-name-cell{display:flex;align-items:center;gap:12px;min-width:0}
+.eq-thumb{width:48px;height:48px;border-radius:10px;object-fit:cover;background:#fff;flex-shrink:0;border:1px solid var(--border);cursor:zoom-in}
+.eq-thumb.ph{display:inline-flex;align-items:center;justify-content:center;background:var(--input-bg);font-size:1.35rem;cursor:default}
+.eq-thumb.sm{width:40px;height:40px;border-radius:8px;font-size:1.1rem}
+.photo-box{display:flex;gap:14px;align-items:center;margin-bottom:16px;padding:12px;border:1px dashed var(--border);border-radius:12px}
+.photo-box .preview{width:96px;height:96px;border-radius:12px;object-fit:cover;background:#fff;flex-shrink:0;border:1px solid var(--border)}
+.photo-box .preview.ph{display:flex;align-items:center;justify-content:center;background:var(--input-bg);font-size:2.2rem}
+.photo-box .actions{display:flex;flex-direction:column;gap:8px;min-width:0}
+.photo-box .hint{font-size:.75rem;color:var(--text-dim)}
+#lightbox{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:2000;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px;cursor:zoom-out}
+#lightbox.open{display:flex}
+#lightbox img{max-width:100%;max-height:82vh;border-radius:12px;background:#fff;object-fit:contain}
+#lightbox .cap{color:#fff;margin-top:12px;font-weight:600;text-align:center}
+.inv-thumb{width:34px;height:34px;object-fit:cover;border-radius:6px;vertical-align:middle;margin-right:8px;border:1px solid #ddd}
 
 /* ─── Slide-out menu (tablets & phones) ────────────── */
 #menu-btn{display:none}
@@ -220,7 +236,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
   .chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;margin-left:-12px;margin-right:-12px;padding-left:12px;padding-right:12px;scrollbar-width:none}
   .chips::-webkit-scrollbar{display:none}
   .chip{padding:8px 14px}
-  .eq-pick{grid-template-columns:1fr 70px auto;padding:10px;border:1px solid var(--border);border-radius:10px}
+  .eq-pick{grid-template-columns:40px 1fr 64px auto;padding:10px;border:1px solid var(--border);border-radius:10px}
   .eq-pick .eq-cat{grid-column:1/-1}
   .btn{min-height:40px}
   .btn-sm{min-height:34px}
@@ -380,6 +396,15 @@ tr:hover td{background:rgba(255,255,255,.025)}
       <span class="modal-title" id="modal-eq-title">Add Equipment</span>
       <button class="modal-close" onclick="closeModal('modal-equipment')">&times;</button>
     </div>
+    <div class="photo-box">
+      <div id="eq-photo-preview" class="preview ph">📷</div>
+      <div class="actions">
+        <input type="file" id="eq-photo-file" accept="image/*" style="display:none" onchange="pickEqPhoto(this)">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('eq-photo-file').click()">📷 Take or choose photo</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="eq-photo-remove" onclick="removeEqPhoto()" style="display:none">Remove photo</button>
+        <span class="hint">On a phone you can use the camera. Photos are resized automatically.</span>
+      </div>
+    </div>
     <div class="input-row">
       <div class="form-group"><label>Name *</label><input id="eq-name" placeholder="Equipment name"></div>
       <div class="form-group"><label>Category *</label>
@@ -524,6 +549,8 @@ tr:hover td{background:rgba(255,255,255,.025)}
   </div>
 </div>
 
+<div id="lightbox" onclick="this.classList.remove('open')"><img id="lightbox-img" alt=""><div class="cap" id="lightbox-cap"></div></div>
+
 <!-- Toast container -->
 <div id="toast"></div>
 
@@ -648,6 +675,7 @@ window.addEventListener('resize', () => { if (window.innerWidth > 1024) closeSid
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   closeSidebar();
+  document.getElementById('lightbox').classList.remove('open');
   document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
 });
 
@@ -685,6 +713,35 @@ function rentalDays(s, e) { if (!s || !e || e <= s) return 1; return Math.round(
 const ROLE_LABEL = { superadmin:'Super Admin', admin:'Admin', staff:'Staff' };
 function isAdmin() { return !!_currentUser && (_currentUser.role === 'admin' || _currentUser.role === 'superadmin'); }
 function isSuperAdmin() { return !!_currentUser && _currentUser.role === 'superadmin'; }
+const CAT_ICON = { 'Camera':'📷', 'Cinema Camera':'🎥', 'Lens':'🔘', 'Drone':'🚁', 'Lighting':'💡', 'Audio':'🎙️',
+                   'Stabilizer':'🎛️', 'Monitor/Recorder':'🖥️', 'Accessories':'🧰' };
+const catIcon = c => CAT_ICON[c] || '📦';
+const escAttr = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+function photoUrl(e) { return `/api/equipment/${e.equipment_id || e.id}/photo?v=${e.photo_v || 0}`; }
+// Thumbnail <img> if the item has a photo, otherwise its category icon. Tap to enlarge.
+function eqThumb(e, cls = '') {
+  return e && e.has_photo
+    ? `<img class="eq-thumb ${cls}" src="${photoUrl(e)}" alt="${escAttr(e.name)}" loading="lazy" onclick="event.stopPropagation(); showPhoto('${photoUrl(e)}', this.alt)">`
+    : `<span class="eq-thumb ph ${cls}" title="No photo yet">${catIcon(e && e.category)}</span>`;
+}
+function showPhoto(src, caption) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox-cap').textContent = caption || '';
+  document.getElementById('lightbox').classList.add('open');
+}
+// Shrink a photo in the browser before upload (max 900px, JPEG) so it loads fast on mobile data
+async function shrinkImage(file, maxSide = 900, quality = 0.82) {
+  let src;
+  try { src = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+  catch {
+    src = await new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => fail(new Error('This picture format is not supported here. Please use a JPG or PNG photo.')); i.src = URL.createObjectURL(file); });
+  }
+  const w = src.width, hgt = src.height, s = Math.min(1, maxSide / Math.max(w, hgt));
+  const c = document.createElement('canvas'); c.width = Math.round(w * s); c.height = Math.round(hgt * s);
+  const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(src, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', quality);
+}
 function today() { return new Date().toISOString().slice(0,10); }
 
 function toast(msg, type='success') {
@@ -920,7 +977,7 @@ function drawEquipment() {
   document.getElementById('eq-note').textContent =
     list.length === _allEquipment.length ? `${list.length} items` : `Showing ${list.length} of ${_allEquipment.length} items`;
   document.getElementById('eq-tbody').innerHTML = list.map(e => `<tr>
-        <td>${e.name}</td>
+        <td><div class="eq-name-cell">${eqThumb(e)}<span>${e.name}</span></div></td>
         <td>${e.serial||'—'}</td>
         <td>${e.category}</td>
         <td>${ghc(e.price)}/day</td>
@@ -938,6 +995,8 @@ async function openEqModal(id) {
   document.getElementById('modal-eq-title').textContent = id ? 'Edit Equipment' : 'Add Equipment';
   ['name','serial','total','price','deposit'].forEach(f => document.getElementById('eq-'+f).value = f==='total'?1:0);
   document.getElementById('eq-cat').value = 'Camera';
+  _eqPhoto = { change: null, data: null };
+  setPhotoPreview(null, 'Camera');
 
   if (id) {
     try {
@@ -948,29 +1007,62 @@ async function openEqModal(id) {
       document.getElementById('eq-total').value   = e.total;
       document.getElementById('eq-price').value   = e.price;
       document.getElementById('eq-deposit').value = e.deposit;
+      setPhotoPreview(e.has_photo ? photoUrl(e) : null, e.category);
     } catch (err) { toast(err.message,'error'); return; }
   }
   openModal('modal-equipment');
 }
 
+// Photo chosen in the equipment dialog: change = 'new' | 'remove' | null (unchanged)
+let _eqPhoto = { change: null, data: null };
+function setPhotoPreview(src, category) {
+  const box = document.getElementById('eq-photo-preview');
+  box.outerHTML = src
+    ? `<img id="eq-photo-preview" class="preview" src="${src}" alt="Equipment photo">`
+    : `<div id="eq-photo-preview" class="preview ph">${catIcon(category)}</div>`;
+  document.getElementById('eq-photo-remove').style.display = src ? '' : 'none';
+}
+async function pickEqPhoto(input) {
+  const file = input.files[0]; input.value = '';
+  if (!file) return;
+  if (!/^image\//.test(file.type) && !/\.(jpe?g|png|webp|heic|heif)$/i.test(file.name)) { toast('Please choose a picture', 'error'); return; }
+  try {
+    const data = await shrinkImage(file);
+    _eqPhoto = { change: 'new', data };
+    setPhotoPreview(data);
+  } catch (err) { toast(err.message || 'Could not read that picture', 'error'); }
+}
+function removeEqPhoto() {
+  _eqPhoto = { change: 'remove', data: null };
+  setPhotoPreview(null, document.getElementById('eq-cat').value);
+}
+
 async function saveEquipment() {
+  const total = parseInt(document.getElementById('eq-total').value)||1;
   const body = {
     name: document.getElementById('eq-name').value.trim(),
     serial: document.getElementById('eq-serial').value.trim() || null,
     category: document.getElementById('eq-cat').value,
-    total: parseInt(document.getElementById('eq-total').value)||1,
-    available: parseInt(document.getElementById('eq-total').value)||1,
+    total,
     price: parseFloat(document.getElementById('eq-price').value)||0,
     deposit: parseFloat(document.getElementById('eq-deposit').value)||0
   };
+  if (!_eqEdit) body.available = total;   // new item: all units available; edits keep rented-out units counted
   if (!body.name) { toast('Name is required','error'); return; }
+  const btn = document.querySelector('#modal-equipment .btn-primary');
+  btn.disabled = true; const label = btn.textContent; btn.textContent = 'Saving…';
   try {
-    if (_eqEdit) await PATCH('/api/equipment/'+_eqEdit, body);
-    else await POST('/api/equipment', body);
+    const saved = _eqEdit ? await PATCH('/api/equipment/'+_eqEdit, body) : await POST('/api/equipment', body);
+    let photoMsg = '';
+    try {
+      if (_eqPhoto.change === 'new')    await api('PUT', `/api/equipment/${saved.id}/photo`, { image: _eqPhoto.data });
+      if (_eqPhoto.change === 'remove') await DELETE(`/api/equipment/${saved.id}/photo`);
+    } catch (perr) { photoMsg = ' — but the photo did not upload: ' + perr.message; }
     closeModal('modal-equipment');
-    toast('Equipment saved');
+    toast('Equipment saved' + photoMsg, photoMsg ? 'error' : 'success');
     renderEquipment();
   } catch (err) { toast(err.message,'error'); }
+  btn.disabled = false; btn.textContent = label;
 }
 
 async function deleteEq(id, name) {
@@ -1096,6 +1188,7 @@ function addEquipmentRow() {
   div.id = 'eq-row-'+id;
   div.className = 'eq-pick';
   div.innerHTML = `
+    <span class="eq-pick-thumb"></span>
     <select class="eq-cat" onchange="pickEqCat(this)" aria-label="Category">
       <option value="">All categories</option>${cats.map(c => `<option>${c}</option>`).join('')}
     </select>
@@ -1119,9 +1212,12 @@ function pickEqCat(sel) {
   calcRentalTotal();
 }
 
-// Quantity can't exceed how many of that item are available
+// Quantity can't exceed how many of that item are available; also shows the item's photo
 function syncQtyMax(itemSel) {
   const opt = itemSel.selectedOptions[0];
+  const eq = opt && _allEquipment.find(x => x.id == opt.value);
+  const t = itemSel.parentElement.querySelector('.eq-pick-thumb');
+  if (t) t.innerHTML = eqThumb(eq, 'sm');
   const qty = itemSel.parentElement.querySelector('.eq-qty');
   const avail = opt ? parseInt(opt.dataset.avail) || 0 : 0;
   qty.max = Math.max(1, avail);
@@ -1286,7 +1382,7 @@ async function showInvoice(id) {
     const r = await GET('/api/rentals/'+id);
     _invoiceRental = r;
     const items = (r.equipment||[]).map(e =>
-      `<tr><td>${e.name}</td><td>${e.serial||'—'}</td><td>${e.qty}</td>
+      `<tr><td>${e.has_photo ? `<img class="inv-thumb" src="${photoUrl(e)}" alt="">` : ''}${e.name}</td><td>${e.serial||'—'}</td><td>${e.qty}</td>
        <td>${ghc(e.unit_price)}${(r.days||1)>1?' × '+r.days+' days':''}</td><td>${ghc(e.unit_price*e.qty*(r.days||1))}</td></tr>`
     ).join('');
 
