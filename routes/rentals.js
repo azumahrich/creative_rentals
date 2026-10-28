@@ -102,11 +102,16 @@ router.post('/', async (req, res) => {
          VALUES ($1,$2,$3,$4,$5)`,
         [rental.id, item.equipment_id, item.qty||1, item.unit_price||0, item.unit_deposit||0]
       );
-      // Decrement availability
-      await pgClient.query(
-        'UPDATE equipment SET available = available - $1 WHERE id = $2',
+      // Decrement availability — refuse if there isn't enough stock
+      const { rowCount: ok } = await pgClient.query(
+        'UPDATE equipment SET available = available - $1 WHERE id = $2 AND available >= $1',
         [item.qty||1, item.equipment_id]
       );
+      if (!ok) {
+        const { rows: [e] } = await pgClient.query('SELECT name, available FROM equipment WHERE id=$1', [item.equipment_id]);
+        await pgClient.query('ROLLBACK');
+        return res.status(409).json({ error: e ? `Only ${e.available} × ${e.name} available` : 'Equipment not found' });
+      }
     }
 
     await pgClient.query('COMMIT');
