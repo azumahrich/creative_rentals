@@ -98,6 +98,15 @@ WHERE NOT EXISTS (SELECT 1 FROM equipment)
   AND NOT EXISTS (SELECT 1 FROM app_meta WHERE key = 'equipment_seeded');
 INSERT INTO app_meta (key, value) VALUES ('equipment_seeded', NOW()::text) ON CONFLICT (key) DO NOTHING;
 
+-- ─── Equipment photos ────────────────────────────────────────────────────────
+-- Stored in the database because the web server's disk is wiped on each deploy
+CREATE TABLE IF NOT EXISTS equipment_photos (
+  equipment_id INTEGER PRIMARY KEY REFERENCES equipment(id) ON DELETE CASCADE,
+  mime         TEXT NOT NULL,
+  data         BYTEA NOT NULL,
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ─── Rentals ─────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS rentals (
   id           SERIAL PRIMARY KEY,
