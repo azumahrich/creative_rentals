@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const db     = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { protectClient } = require('../middleware/privacy');
 
 router.use(requireAuth);
 
@@ -47,7 +48,7 @@ router.get('/', async (req, res) => {
     const { rows } = await db.query(sql, p);
     // Enrich each rental with equipment + payments
     const result = await Promise.all(rows.map(r => enrichRental(r)));
-    res.json(result);
+    res.json(result.map(r => protectClient(r, req.user)));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -61,7 +62,7 @@ router.get('/:id', async (req, res) => {
        WHERE r.id=$1`, [req.params.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Rental not found' });
-    res.json(await enrichRental(rows[0]));
+    res.json(protectClient(await enrichRental(rows[0]), req.user));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -129,7 +130,8 @@ router.post('/', async (req, res) => {
 });
 
 // PATCH /api/rentals/:id
-router.patch('/:id', async (req, res) => {
+// Staff can create rentals; only admins change (e.g. mark returned) or delete them
+router.patch('/:id', requireAdmin, async (req, res) => {
   // Dates/prices are fixed once a rental is created (recreate the rental to change them)
   const allowed = ['status','notes'];
   const updates = [];
@@ -175,7 +177,7 @@ router.patch('/:id', async (req, res) => {
 });
 
 // DELETE /api/rentals/:id  (only cancellable/active)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   const pgClient = await db.connect();
   try {
     await pgClient.query('BEGIN');
