@@ -79,6 +79,47 @@ try {
   process.exit(1);
 }
 
+/*
+ * Emergency Super Admin password reset (for when the Super Admin is locked out).
+ * In Render → web service → Environment, add:
+ *   RESET_SUPERADMIN_PASSWORD = the new password (at least 8 characters)
+ *   RESET_SUPERADMIN_USERNAME = (optional) whose account; default = the first Super Admin
+ * Save → the app restarts and applies it once. Then DELETE the variable(s).
+ * The same value is never applied twice, so leaving it set can't undo a later password change.
+ */
+async function emergencySuperAdminReset() {
+  const newPw = (process.env.RESET_SUPERADMIN_PASSWORD || '').trim();
+  if (!newPw) return;
+  if (newPw.length < 8) { console.error('[recovery] RESET_SUPERADMIN_PASSWORD must be at least 8 characters — not applied.'); return; }
+  const wantUser = (process.env.RESET_SUPERADMIN_USERNAME || '').trim().toLowerCase();
+  const crypto = require('crypto');
+  const fingerprint = crypto.createHash('sha256').update(wantUser + '|' + newPw).digest('hex');
+  const { rows: done } = await db.query("SELECT value FROM app_meta WHERE key='superadmin_reset'");
+  if (done.length && done[0].value === fingerprint) {
+    console.log('[recovery] This reset was already applied. Remove RESET_SUPERADMIN_PASSWORD from the Environment settings.');
+    return;
+  }
+  const hash = await bcrypt.hash(newPw, 10);
+  let target;
+  if (wantUser) {
+    ({ rows: [target] } = await db.query('SELECT id, username FROM users WHERE username=$1', [wantUser]));
+    if (!target) { console.error(`[recovery] No user called "${wantUser}" — not applied.`); return; }
+  } else {
+    ({ rows: [target] } = await db.query("SELECT id, username FROM users WHERE role='superadmin' ORDER BY id LIMIT 1"));
+  }
+  if (target) {
+    await db.query("UPDATE users SET password=$1, role='superadmin', active=TRUE WHERE id=$2", [hash, target.id]);
+  } else {
+    ({ rows: [target] } = await db.query(
+      "INSERT INTO users (username, password, name, role) VALUES ('admin',$1,'Super Admin','superadmin') " +
+      "ON CONFLICT (username) DO UPDATE SET password=EXCLUDED.password, role='superadmin', active=TRUE RETURNING id, username", [hash]));
+  }
+  await db.query(
+    "INSERT INTO app_meta (key, value) VALUES ('superadmin_reset', $1) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value", [fingerprint]);
+  console.log(`[recovery] Password reset for Super Admin "${target.username}". Log in now, then REMOVE RESET_SUPERADMIN_PASSWORD from the Environment settings.`);
+}
+
 setupDatabase()
+  .then(emergencySuperAdminReset)
   .then(() => app.listen(PORT, () => console.log(`Creative Rentals running on port ${PORT}`)))
   .catch(err => { console.error('Database setup failed: ' + describeDbError(err)); process.exit(1); });
