@@ -310,11 +310,11 @@ tr:hover td{background:rgba(255,255,255,.025)}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7 16 1 1 16l7 7 15-15Z"/><path d="m3.5 21.5 3-3"/></svg>
         Equipment
       </div>
-      <div class="nav-item" data-page="payments" onclick="navigate('payments')">
+      <div class="nav-item admin-nav-item" data-page="payments" onclick="navigate('payments')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
         Payments
       </div>
-      <div class="nav-item" data-page="reports" onclick="navigate('reports')">
+      <div class="nav-item admin-nav-item" data-page="reports" onclick="navigate('reports')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
         Reports
       </div>
@@ -650,6 +650,7 @@ async function bootApp() {
   document.getElementById('user-role-display').textContent = ROLE_LABEL[_currentUser.role] || _currentUser.role;
 
   // Show admin nav
+  document.querySelectorAll('.admin-nav-item').forEach(el => el.style.display = isAdmin() ? '' : 'none');
   if (isAdmin()) {
     document.getElementById('admin-nav').style.display = 'block';
     document.getElementById('nav-settings').style.display = isSuperAdmin() ? 'flex' : 'none';
@@ -667,8 +668,10 @@ const PAGES = { dashboard: renderDashboard, rentals: renderRentals, clients: ren
 
 let _page = 'dashboard';
 
+const ADMIN_PAGES = ['payments','reports','users','settings'];
 function navigate(page) {
   if (!PAGES[page]) return;
+  if (ADMIN_PAGES.includes(page) && !isAdmin()) page = 'dashboard';
   _page = page;
   closeSidebar();
   document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === page));
@@ -820,8 +823,8 @@ async function renderDashboard() {
         <div class="stat-card"><div class="stat-label">Overdue</div><div class="stat-value text-red">${stats.overdue_rentals}</div></div>
         <div class="stat-card"><div class="stat-label">Total Clients</div><div class="stat-value">${stats.total_clients}</div></div>
         <div class="stat-card"><div class="stat-label">Equipment Items</div><div class="stat-value">${stats.total_equipment}</div></div>
-        <div class="stat-card"><div class="stat-label">This Month Revenue</div><div class="stat-value text-green">${ghc(stats.month_revenue)}</div><div class="stat-sub">collected</div></div>
-        <div class="stat-card"><div class="stat-label">Outstanding</div><div class="stat-value text-red">${ghc(stats.outstanding)}</div><div class="stat-sub">unpaid balance</div></div>
+        ${isAdmin() ? `<div class="stat-card"><div class="stat-label">This Month Revenue</div><div class="stat-value text-green">${ghc(stats.month_revenue)}</div><div class="stat-sub">collected</div></div>
+        <div class="stat-card"><div class="stat-label">Outstanding</div><div class="stat-value text-red">${ghc(stats.outstanding)}</div><div class="stat-sub">unpaid balance</div></div>` : ''}
       </div>
       <div class="card">
         <div class="card-header">
@@ -847,8 +850,10 @@ let _clientEdit = null;
 
 async function renderClients() {
   const action = document.getElementById('topbar-action');
-  action.textContent = '+ New Client'; action.style.display = 'flex';
-  action.onclick = () => openClientModal(null);
+  if (isAdmin()) {   // staff can view clients but not add, edit or delete them
+    action.textContent = '+ New Client'; action.style.display = 'flex';
+    action.onclick = () => openClientModal(null);
+  }
 
   try {
     const clients = await GET('/api/clients');
@@ -860,12 +865,7 @@ async function renderClients() {
         <td>${c.email||'—'}</td>
         <td>${c.ghana_card||'—'}</td>
         <td>${fmtDate(c.joined)}</td>
-        <td>
-          <div class="flex gap-2">
-            <button class="btn-icon btn-sm" title="Edit" onclick="openClientModal(${c.id})">✏️</button>
-            <button class="btn-icon btn-sm" title="Delete" onclick="deleteClient(${c.id},'${c.name.replace(/'/g,"\\'")}')">🗑️</button>
-          </div>
-        </td>
+        <td>${clientActions(c)}</td>
       </tr>`;
     });
 
@@ -874,7 +874,7 @@ async function renderClients() {
       <div class="toolbar">
         <div class="search-wrap">
           <span class="search-icon">🔍</span>
-          <input placeholder="Search clients…" id="client-search" oninput="filterClients(this.value)">
+          <input placeholder="${isAdmin() ? 'Search name, phone or Ghana Card…' : 'Search by name…'}" id="client-search" oninput="filterClients(this.value)">
         </div>
       </div>
       <div class="table-wrap">
@@ -888,22 +888,34 @@ async function renderClients() {
 }
 
 let _allClients = [];
+function clientActions(c) {
+  if (!isAdmin()) return '';
+  return `<div class="flex gap-2">
+    <button class="btn-icon btn-sm" title="Edit" onclick="openClientModal(${c.id})">✏️</button>
+    <button class="btn-icon btn-sm" title="Delete" onclick="deleteClient(${c.id},'${c.name.replace(/'/g,"\\'")}')">🗑️</button>
+  </div>`;
+}
+// Staff: create rentals, record payments, view/print/share invoices. Admins: also mark returned & delete.
+function rentalActions(r) {
+  return `<div class="flex gap-2">
+    <button class="btn-icon btn-sm" title="Invoice" onclick="showInvoice(${r.id})">📄</button>
+    <button class="btn-icon btn-sm" title="Record payment" onclick="openPaymentModal(${r.id},'${(r.client_name||'').replace(/'/g,"\\'")}',${(+r.subtotal)+(+r.deposit_amt)},${r.total_paid})">💰</button>
+    ${isAdmin() && (r.status==='active'||r.status==='overdue') ? `<button class="btn-icon btn-sm" title="Mark Returned" onclick="markReturned(${r.id})">✅</button>` : ''}
+    ${isAdmin() ? `<button class="btn-icon btn-sm" title="Delete" onclick="deleteRental(${r.id})">🗑️</button>` : ''}
+  </div>`;
+}
 function filterClients(q) {
   q = q.toLowerCase();
   const rows = _allClients.filter(c =>
     (c.name||'').toLowerCase().includes(q) ||
-    (c.phone||'').toLowerCase().includes(q) ||
-    (c.ghana_card||'').toLowerCase().includes(q) ||
-    (c.company||'').toLowerCase().includes(q)
+    (c.company||'').toLowerCase().includes(q) ||
+    (isAdmin() && ((c.phone||'').toLowerCase().includes(q) || (c.ghana_card||'').toLowerCase().includes(q)))
   );
   document.getElementById('clients-tbody').innerHTML = rows.map(c => `
     <tr>
       <td>${c.name}</td><td>${c.phone||'—'}</td><td>${c.email||'—'}</td>
       <td>${c.ghana_card||'—'}</td><td>${fmtDate(c.joined)}</td>
-      <td><div class="flex gap-2">
-        <button class="btn-icon btn-sm" onclick="openClientModal(${c.id})">✏️</button>
-        <button class="btn-icon btn-sm" onclick="deleteClient(${c.id},'${c.name.replace(/'/g,"\\'")}')">🗑️</button>
-      </div></td>
+      <td>${clientActions(c)}</td>
     </tr>`).join('') || '<tr><td colspan="6" class="empty">No matches</td></tr>';
 }
 
@@ -1128,14 +1140,7 @@ async function renderRentals() {
         <td>${statusBadge(r.status)}</td>
         <td>${ghc(r.subtotal)}</td>
         <td>${ghc(r.total_paid)}</td>
-        <td>
-          <div class="flex gap-2">
-            <button class="btn-icon btn-sm" title="Invoice" onclick="showInvoice(${r.id})">📄</button>
-            <button class="btn-icon btn-sm" title="Payment" onclick="openPaymentModal(${r.id},'${r.client_name||''}',${(+r.subtotal)+(+r.deposit_amt)},${r.total_paid})">💰</button>
-            ${(r.status==='active'||r.status==='overdue')?`<button class="btn-icon btn-sm" title="Mark Returned" onclick="markReturned(${r.id})">✅</button>`:''}
-            <button class="btn-icon btn-sm" title="Delete" onclick="deleteRental(${r.id})">🗑️</button>
-          </div>
-        </td>
+        <td>${rentalActions(r)}</td>
       </tr>`;
     });
 
@@ -1173,12 +1178,7 @@ function filterRentalsByStatus(status) {
       <td>${statusBadge(r.status)}</td>
       <td>${ghc(r.subtotal)}</td>
       <td>${ghc(r.total_paid)}</td>
-      <td><div class="flex gap-2">
-        <button class="btn-icon btn-sm" onclick="showInvoice(${r.id})">📄</button>
-        <button class="btn-icon btn-sm" onclick="openPaymentModal(${r.id},'${r.client_name||''}',${(+r.subtotal)+(+r.deposit_amt)},${r.total_paid})">💰</button>
-        ${(r.status==='active'||r.status==='overdue')?`<button class="btn-icon btn-sm" onclick="markReturned(${r.id})">✅</button>`:''}
-        <button class="btn-icon btn-sm" onclick="deleteRental(${r.id})">🗑️</button>
-      </div></td>
+      <td>${rentalActions(r)}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="8" class="empty">No rentals</td></tr>';
 }
@@ -1526,7 +1526,8 @@ function shareWhatsApp() {
     `*Balance Due:* ${ghc(balance)}\n\n` +
     `Thank you for choosing Creative Rentals! 🎥`;
 
-  let phone = (r.client_phone||'').replace(/[\s\-\(\)]/g,'');
+  // Staff see a masked number, so WhatsApp opens without a number and they pick the chat themselves
+  let phone = r.contact_hidden ? '' : (r.client_phone||'').replace(/[\s\-\(\)]/g,'');
   if (phone.startsWith('0')) phone = '233'+phone.slice(1);
   const url = phone
     ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
