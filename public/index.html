@@ -338,6 +338,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
           <div class="user-role" id="user-role-display">—</div>
         </div>
       </div>
+      <button class="btn-logout" onclick="openMyPassword()">🔑 Change my password</button>
       <button class="btn-logout" onclick="doLogout()">Sign Out</button>
     </div>
   </nav>
@@ -502,6 +503,23 @@ tr:hover td{background:rgba(255,255,255,.025)}
       <button class="btn btn-secondary" onclick="window.print()">🖨 Print</button>
       <button class="btn btn-primary" id="btn-whatsapp" onclick="shareWhatsApp()">📲 Share WhatsApp</button>
       <button class="btn btn-secondary" onclick="closeModal('modal-invoice')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Change My Password Modal -->
+<div class="modal-overlay" id="modal-mypw">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Change my password</span>
+      <button class="modal-close" onclick="closeModal('modal-mypw')">&times;</button>
+    </div>
+    <div class="form-group"><label>Current password</label><input id="mypw-current" type="password" autocomplete="current-password"></div>
+    <div class="form-group"><label>New password <span class="text-dim">(at least 6 characters)</span></label><input id="mypw-new" type="password" autocomplete="new-password"></div>
+    <div class="form-group"><label>Type the new password again</label><input id="mypw-new2" type="password" autocomplete="new-password"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-mypw')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMyPassword()">Change password</button>
     </div>
   </div>
 </div>
@@ -741,6 +759,21 @@ async function shrinkImage(file, maxSide = 900, quality = 0.82) {
   const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
   ctx.drawImage(src, 0, 0, c.width, c.height);
   return c.toDataURL('image/jpeg', quality);
+}
+function openMyPassword() {
+  ['current','new','new2'].forEach(f => document.getElementById('mypw-'+f).value = '');
+  closeSidebar(); openModal('modal-mypw');
+}
+async function saveMyPassword() {
+  const current = document.getElementById('mypw-current').value;
+  const pw = document.getElementById('mypw-new').value, pw2 = document.getElementById('mypw-new2').value;
+  if (!current || !pw) { toast('Fill in all three boxes', 'error'); return; }
+  if (pw.length < 6)   { toast('New password must be at least 6 characters', 'error'); return; }
+  if (pw !== pw2)      { toast('The two new passwords do not match', 'error'); return; }
+  try {
+    await POST('/api/auth/change-password', { current, password: pw });
+    closeModal('modal-mypw'); toast('Password changed');
+  } catch (err) { toast(err.message, 'error'); }
 }
 function today() { return new Date().toISOString().slice(0,10); }
 
