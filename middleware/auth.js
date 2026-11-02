@@ -22,6 +22,8 @@ async function requireAuth(req, res, next) {
       'SELECT id, username, name, role FROM users WHERE id=$1 AND active', [payload.id]);
     if (!rows.length) return res.status(401).json({ error: 'Account disabled or removed' });
     req.user = rows[0];
+    // "Last active" for the Users page (updated at most every 2 minutes)
+    db.query("UPDATE users SET last_seen_at=NOW() WHERE id=$1 AND (last_seen_at IS NULL OR last_seen_at < NOW() - INTERVAL '2 minutes')", [req.user.id]).catch(() => {});
     next();
   } catch (err) {
     res.status(500).json({ error: err.message });

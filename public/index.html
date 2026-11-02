@@ -103,6 +103,17 @@ tr:hover td{background:rgba(255,255,255,.025)}
 .badge-overdue{background:#7f1d1d;color:#fca5a5}
 .badge-cancelled{background:#374151;color:#9ca3af}
 .badge-booked{background:#3b2a6b;color:#c4b5fd}
+.act-when{white-space:nowrap;font-size:.82rem}
+.act-when small{display:block;color:var(--text-dim);font-size:.72rem}
+.act-sum{line-height:1.45}
+.act-sum .ico{margin-right:6px}
+.act-changes{margin-top:6px;font-size:.78rem;color:var(--text-dim)}
+.act-changes div{padding:2px 0}
+.act-changes b{color:var(--text);font-weight:600}
+.act-from{text-decoration:line-through;opacity:.75}
+.act-to{color:#86efac}
+.act-row-warn td{background:rgba(239,68,68,.07)}
+.act-dev{font-size:.75rem;color:var(--text-dim);white-space:nowrap}
 .booking-note{background:#2a2350;border:1px solid #4c3d8f;color:#ddd6fe;border-radius:10px;padding:10px 14px;font-size:.86rem;margin-top:10px;line-height:1.45}
 .sub-note{display:block;font-size:.72rem;color:var(--text-dim);margin-top:3px}
 .badge-admin{background:#4c1d95;color:#c4b5fd}
@@ -331,6 +342,10 @@ tr:hover td{background:rgba(255,255,255,.025)}
       <div class="nav-item" id="nav-settings" data-page="settings" onclick="navigate('settings')" style="display:none">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
         Settings
+      </div>
+      <div class="nav-item" id="nav-activity" data-page="activity" onclick="navigate('activity')" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Activity Log
       </div>
     </div>
     <div class="sidebar-bottom">
@@ -658,6 +673,7 @@ async function bootApp() {
   if (isAdmin()) {
     document.getElementById('admin-nav').style.display = 'block';
     document.getElementById('nav-settings').style.display = isSuperAdmin() ? 'flex' : 'none';
+    document.getElementById('nav-activity').style.display = isSuperAdmin() ? 'flex' : 'none';
   }
 
   navigate('dashboard');
@@ -668,19 +684,20 @@ async function bootApp() {
 // ═══════════════════════════════════════════════════════════════════
 const PAGES = { dashboard: renderDashboard, rentals: renderRentals, clients: renderClients,
                 equipment: renderEquipment, payments: renderPaymentsPage,
-                reports: renderReports, users: renderUsers, settings: renderSettings };
+                reports: renderReports, users: renderUsers, settings: renderSettings, activity: renderActivity };
 
 let _page = 'dashboard';
 
-const ADMIN_PAGES = ['payments','reports','users','settings'];
+const ADMIN_PAGES = ['payments','reports','users','settings','activity'];
 function navigate(page) {
   if (!PAGES[page]) return;
   if (ADMIN_PAGES.includes(page) && !isAdmin()) page = 'dashboard';
+  if (page === 'activity' && !isSuperAdmin()) page = 'dashboard';
   _page = page;
   closeSidebar();
   document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === page));
   const titles = { dashboard:'Dashboard', rentals:'Rentals', clients:'Clients',
-                   equipment:'Equipment', payments:'Payments', reports:'Reports', users:'Users', settings:'Settings' };
+                   equipment:'Equipment', payments:'Payments', reports:'Reports', users:'Users', settings:'Settings', activity:'Activity Log' };
   document.getElementById('topbar-title').textContent = titles[page] || page;
   const action = document.getElementById('topbar-action');
   action.style.display = 'none';
@@ -924,6 +941,7 @@ let _allClients = [];
 function clientActions(c) {
   if (!isAdmin()) return '';
   return `<div class="flex gap-2">
+    ${isSuperAdmin() ? `<button class="btn-icon btn-sm" title="History" onclick="showClientHistory(${c.id})">🕘</button>` : ''}
     <button class="btn-icon btn-sm" title="Edit" onclick="openClientModal(${c.id})">✏️</button>
     <button class="btn-icon btn-sm" title="Delete" onclick="deleteClient(${c.id},'${c.name.replace(/'/g,"\\'")}')">🗑️</button>
   </div>`;
@@ -1705,7 +1723,8 @@ function downloadCSV(name, header, rows) {
   const csv = '﻿' + [header, ...rows].map(r => r.map(cell).join(',')).join('\r\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  const f = document.getElementById('rpt-from').value || 'start', t = document.getElementById('rpt-to').value || 'now';
+  const val = id => (document.getElementById(id) || {}).value;
+  const f = val('rpt-from') || val('act-from') || 'start', t = val('rpt-to') || val('act-to') || 'now';
   a.download = `CreativeRentals_${name}_${f}_to_${t}.csv`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
@@ -1800,6 +1819,134 @@ async function loadReport() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+//  Activity Log  (Super Admin only)
+// ═══════════════════════════════════════════════════════════════════
+function fmtDateTime(d) { return new Date(d).toLocaleString('en-GB', { timeZone:'Africa/Accra', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }); }
+function timeAgo(d) {
+  const s = Math.max(0, (Date.now() - new Date(d)) / 1000);
+  if (s < 120) return 'Just now';
+  if (s < 3600) return Math.floor(s/60) + ' min ago';
+  if (s < 86400) return Math.floor(s/3600) + ' h ago';
+  if (s < 7*86400) return Math.floor(s/86400) + ' day' + (s < 2*86400 ? '' : 's') + ' ago';
+  return fmtDate(d);
+}
+const ACT_ICON = { login:'🔓', login_failed:'⛔', password_change:'🔑', emergency_reset:'🆘',
+  rental_create:'📦', booking_create:'📅', rental_pickup:'🤝', rental_return:'✅', booking_cancel:'✖️', rental_delete:'🗑️',
+  payment_create:'💰', payment_delete:'🗑️', client_create:'👤', client_update:'✏️', client_delete:'🗑️',
+  equipment_create:'🎬', equipment_update:'✏️', equipment_photo:'📷', equipment_delete:'🗑️',
+  user_create:'🧑‍💼', user_update:'🛠️', user_delete:'🗑️', data_clear:'⚠️', data_import:'⬆️' };
+const ACT_WARN = ['login_failed','rental_delete','payment_delete','client_delete','equipment_delete','user_delete','data_clear','emergency_reset'];
+let _act = { items: [], more: false, filters: {} };
+
+async function renderActivity() {
+  if (!isSuperAdmin()) { navigate('dashboard'); return; }
+  const preset = _actPreset || {}; _actPreset = null;
+  const [users, clients, stats] = await Promise.all([GET('/api/users'), GET('/api/clients'), GET('/api/activity/stats')]);
+  document.getElementById('page-content').innerHTML = `
+    <h1 class="page-title">Activity Log</h1>
+    <p class="text-dim" style="margin:-8px 0 16px;font-size:.88rem">Everything people do in the app is recorded here automatically. Only the Super Admin can see this page, and entries can't be changed or deleted.</p>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">Actions today</div><div class="stat-value">${stats.today}</div></div>
+      <div class="stat-card"><div class="stat-label">People active (7 days)</div><div class="stat-value">${stats.people_7d}</div></div>
+      <div class="stat-card" style="cursor:pointer" onclick="quickActivity('deletes')"><div class="stat-label">Deletions (7 days)</div><div class="stat-value text-red">${stats.deletes_7d}</div><div class="stat-sub">tap to view</div></div>
+      <div class="stat-card" style="cursor:pointer" onclick="quickActivity('failed')"><div class="stat-label">Failed sign-ins (7 days)</div><div class="stat-value text-red">${stats.failed_7d}</div><div class="stat-sub">tap to view</div></div>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="input-row-3">
+        <div class="form-group"><label>Person</label>
+          <select id="act-user"><option value="">Everyone</option>${users.map(u => `<option value="${u.id}">${u.name} (${u.username})</option>`).join('')}</select></div>
+        <div class="form-group"><label>Type</label>
+          <select id="act-type">
+            <option value="">All activity</option>
+            <option value="rentals">Rentals & bookings</option>
+            <option value="payments">Payments</option>
+            <option value="clients">Clients</option>
+            <option value="equipment">Equipment</option>
+            <option value="users">User accounts</option>
+            <option value="signins">Sign-ins & passwords</option>
+            <option value="failed">⛔ Failed sign-ins only</option>
+            <option value="deletes">🗑️ Deletions & cancellations</option>
+            <option value="system">Super Admin actions</option>
+          </select></div>
+        <div class="form-group"><label>Client</label>
+          <select id="act-client"><option value="">Any client</option>${clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select></div>
+      </div>
+      <div class="input-row-3">
+        <div class="form-group"><label>From</label><input type="date" id="act-from"></div>
+        <div class="form-group"><label>To</label><input type="date" id="act-to"></div>
+        <div class="form-group"><label>Search</label><input id="act-q" placeholder="e.g. #R-0012, MoMo, Sony…"></div>
+      </div>
+      <div class="flex gap-2" style="flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="loadActivity()">Show</button>
+        <button class="btn btn-secondary" onclick="resetActivityFilters()">Clear filters</button>
+        <button class="btn btn-secondary" onclick="exportActivity()">⬇ Excel (CSV)</button>
+      </div>
+    </div>
+    <div id="act-list" class="loading">Loading…</div>`;
+  ['act-user','act-type','act-client','act-from','act-to'].forEach(id => document.getElementById(id).addEventListener('change', () => loadActivity()));
+  document.getElementById('act-q').addEventListener('keydown', e => { if (e.key === 'Enter') loadActivity(); });
+  if (preset.client_id) document.getElementById('act-client').value = preset.client_id;
+  if (preset.type) document.getElementById('act-type').value = preset.type;
+  loadActivity();
+}
+function activityFilters() {
+  const f = {};
+  [['user_id','act-user'],['type','act-type'],['client_id','act-client'],['from','act-from'],['to','act-to'],['q','act-q']]
+    .forEach(([k, id]) => { const v = document.getElementById(id).value.trim(); if (v) f[k] = v; });
+  return f;
+}
+function resetActivityFilters() { ['act-user','act-type','act-client','act-from','act-to','act-q'].forEach(id => document.getElementById(id).value = ''); loadActivity(); }
+function quickActivity(type) { document.getElementById('act-type').value = type; const d = new Date(Date.now() - 6*864e5).toISOString().slice(0,10); document.getElementById('act-from').value = d; loadActivity(); }
+let _actPreset = null;
+function showClientHistory(id) { _actPreset = { client_id: id }; navigate('activity'); }
+
+async function loadActivity(more = false) {
+  const f = activityFilters();
+  const box = document.getElementById('act-list');
+  if (!more) { box.className = 'loading'; box.innerHTML = 'Loading…'; }
+  const params = new URLSearchParams({ ...f, limit: 100 });
+  if (more && _act.items.length) params.set('before_id', _act.items[_act.items.length - 1].id);
+  try {
+    const r = await GET('/api/activity?' + params);
+    _act = { items: more ? _act.items.concat(r.items) : r.items, more: r.more, filters: f };
+    drawActivity();
+  } catch (err) { box.className = ''; box.innerHTML = `<div class="empty text-red">${err.message}</div>`; }
+}
+function drawActivity() {
+  const box = document.getElementById('act-list'); box.className = '';
+  const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const rows = _act.items.map(a => {
+    const who = a.user_name ? `${esc(a.user_name)}<span class="sub-note">@${esc(a.username)} · ${ROLE_LABEL[a.role] || a.role || ''}</span>`
+                            : (a.username ? `<span class="text-dim">“${esc(a.username)}”</span><span class="sub-note">unknown user</span>` : '<span class="text-dim">—</span>');
+    const changes = Array.isArray(a.changes) && a.changes.length && !['client_delete','rental_delete','payment_delete'].includes(a.action)
+      ? `<div class="act-changes">${a.changes.map(c => `<div><b>${esc(c.field)}:</b> <span class="act-from">${esc(c.from)}</span> → <span class="act-to">${esc(c.to)}</span></div>`).join('')}</div>` : '';
+    return `<tr class="${ACT_WARN.includes(a.action) ? 'act-row-warn' : ''}">
+      <td><div class="act-when">${fmtDateTime(a.at)}<small>${timeAgo(a.at)}</small></div></td>
+      <td>${who}</td>
+      <td><div class="act-sum"><span class="ico">${ACT_ICON[a.action] || '•'}</span>${esc(a.summary)}</div>${changes}</td>
+      <td><div class="act-dev">${esc(a.device || '—')}${a.ip ? `<br>${esc(a.ip)}` : ''}</div></td>
+    </tr>`; }).join('');
+  box.innerHTML = `
+    <div class="card">
+      <div class="card-header"><span class="card-title">${_act.items.length}${_act.more ? '+' : ''} entr${_act.items.length === 1 ? 'y' : 'ies'}</span></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>When</th><th>Who</th><th>What happened</th><th>Device</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="4" class="empty">Nothing recorded for these filters yet</td></tr>'}</tbody>
+      </table></div>
+      ${_act.more ? `<div style="text-align:center;margin-top:14px"><button class="btn btn-secondary" onclick="loadActivity(true)">Load older entries</button></div>` : ''}
+    </div>`;
+}
+async function exportActivity() {
+  try {
+    const r = await GET('/api/activity?' + new URLSearchParams({ ...activityFilters(), limit: 5000 }));
+    downloadCSV('activity', ['When (Ghana time)','Name','Username','Role','Action','What happened','Changes','Device','IP'],
+      r.items.map(a => [fmtDateTime(a.at), a.user_name, a.username, ROLE_LABEL[a.role] || a.role, a.action, a.summary,
+        (a.changes || []).map(c => `${c.field}: ${c.from} -> ${c.to}`).join(' | '), a.device, a.ip]));
+    if (r.more) toast('Downloaded the newest 5,000 entries — narrow the dates for older ones', 'info');
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
 //  Users  (admin only)
 // ═══════════════════════════════════════════════════════════════════
 let _userEdit = null, _allUsers = [];
@@ -1822,6 +1969,7 @@ async function renderUsers() {
         <td><span class="badge badge-${u.role}">${ROLE_LABEL[u.role]||u.role}</span></td>
         <td><span class="badge ${u.active?'badge-active':'badge-cancelled'}">${u.active?'Active':'Inactive'}</span></td>
         <td>${fmtDate(u.created_at)}</td>
+        <td>${u.last_seen_at ? `<span title="Last sign-in: ${u.last_login_at ? fmtDateTime(u.last_login_at) : '—'}">${timeAgo(u.last_seen_at)}</span>` : '<span class="text-dim">Never</span>'}</td>
         <td>
           ${u.can_manage ? `<div class="flex gap-2">
             <button class="btn-icon btn-sm" title="Edit" onclick="openUserModal(${u.id})">✏️</button>
@@ -1838,7 +1986,7 @@ async function renderUsers() {
         : 'You can manage staff accounts. Admin accounts are controlled by the Super Admin.'}</p>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th>Created</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th>Created</th><th>Last active</th><th></th></tr></thead>
           <tbody>${rows||'<tr><td colspan="6" class="empty">No users</td></tr>'}</tbody>
         </table>
       </div>`;

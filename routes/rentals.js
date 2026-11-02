@@ -3,6 +3,20 @@ const db     = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { protectClient } = require('../middleware/privacy');
 const { availabilityFor, TODAY } = require('./availability');
+const { note, money } = require('../middleware/activity');
+
+// One-line description of a rental for the activity log
+async function describe(q, rentalId) {
+  const { rows: [r] } = await q.query(
+    `SELECT r.id, r.client_id, r.start_date, r.end_date, r.days, r.status, r.subtotal, r.deposit_amt, r.total_paid, c.name AS client,
+            (SELECT string_agg(CASE WHEN re.qty > 1 THEN re.qty || ' × ' || e.name ELSE e.name END, ', ')
+               FROM rental_equipment re JOIN equipment e ON e.id = re.equipment_id WHERE re.rental_id = r.id) AS items
+     FROM rentals r JOIN clients c ON c.id = r.client_id WHERE r.id=$1`, [rentalId]);
+  if (!r) return { text: '#R-' + String(rentalId).padStart(4, '0'), client_id: null };
+  const dates = r.start_date === r.end_date ? r.start_date : `${r.start_date} → ${r.end_date}`;
+  return { r, client_id: r.client_id,
+    text: `#R-${String(r.id).padStart(4,'0')} for ${r.client} — ${r.items || 'no items'}, ${dates}, ${money(r.subtotal)} + deposit ${money(r.deposit_amt)}` };
+}
 
 router.use(requireAuth);
 
@@ -195,7 +209,10 @@ router.post('/', async (req, res) => {
     // Handed over today → take the stock now. Bookings take stock at pickup.
     if (status === 'active') await takeStock(pgClient, rental.id);
 
+    const d = await describe(pgClient, rental.id);
     await pgClient.query('COMMIT');
+    note(res, { action: status === 'booked' ? 'booking_create' : 'rental_create', entity: 'rental', entity_id: rental.id, client_id: d.client_id,
+      summary: `${status === 'booked' ? 'Booked' : 'Created rental'} ${d.text}` });
     res.status(201).json(await enrichRental(rental));
   } catch (err) {
     await pgClient.query('ROLLBACK');
@@ -224,7 +241,9 @@ router.post('/:id/pickup', async (req, res) => {
     }
     await takeStock(pgClient, r.id);
     const { rows: [u] } = await pgClient.query("UPDATE rentals SET status='active' WHERE id=$1 RETURNING *", [r.id]);
+    const d = await describe(pgClient, r.id);
     await pgClient.query('COMMIT');
+    note(res, { action: 'rental_pickup', entity: 'rental', entity_id: r.id, client_id: d.client_id, summary: `Handed over (picked up) ${d.text}` });
     res.json(await enrichRental(u));
   } catch (err) {
     await pgClient.query('ROLLBACK');
@@ -240,6 +259,8 @@ router.post('/:id/cancel', requireAdmin, async (req, res) => {
     const { rows } = await db.query(
       "UPDATE rentals SET status='cancelled' WHERE id=$1 AND status='booked' RETURNING *", [req.params.id]);
     if (!rows.length) return res.status(400).json({ error: 'Only bookings that have not been picked up can be cancelled' });
+    const d = await describe(db, rows[0].id);
+    note(res, { action: 'booking_cancel', entity: 'rental', entity_id: rows[0].id, client_id: d.client_id, summary: `Cancelled booking ${d.text}` });
     res.json(await enrichRental(rows[0]));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -261,6 +282,9 @@ router.patch('/:id', requireAdmin, async (req, res) => {
       }
       await putBackStock(pgClient, r.id);
       await pgClient.query("UPDATE rentals SET status='returned' WHERE id=$1", [r.id]);
+      const d = await describe(pgClient, r.id);
+      note(res, { action: 'rental_return', entity: 'rental', entity_id: r.id, client_id: d.client_id,
+        summary: `Marked returned ${d.text}${r.status === 'overdue' ? ' (was overdue)' : ''}` });
     }
     if (notes !== undefined) await pgClient.query('UPDATE rentals SET notes=$1 WHERE id=$2', [notes, r.id]);
     const { rows: [u] } = await pgClient.query('SELECT * FROM rentals WHERE id=$1', [r.id]);
@@ -283,6 +307,10 @@ router.delete('/:id', requireAdmin, async (req, res) => {
     if (!rows.length) { await pgClient.query('ROLLBACK'); return res.status(404).json({ error: 'Rental not found' }); }
     // Only equipment that is actually out goes back into stock
     if (['active','overdue'].includes(rows[0].status)) await putBackStock(pgClient, rows[0].id);
+    const d = await describe(pgClient, rows[0].id);
+    note(res, { action: 'rental_delete', entity: 'rental', entity_id: rows[0].id, client_id: d.client_id,
+      changes: [{ field: 'Rental', from: `${rows[0].status}, paid ${money(rows[0].total_paid)}`, to: '(deleted with its payments)' }],
+      summary: `Deleted rental ${d.text} (status ${rows[0].status}, paid ${money(rows[0].total_paid)})` });
     await pgClient.query('DELETE FROM rentals WHERE id=$1', [req.params.id]);
     await pgClient.query('COMMIT');
     res.json({ ok: true });

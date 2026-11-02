@@ -2,6 +2,7 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const db     = require('../db');
 const { requireAuth, requireSuperAdmin } = require('../middleware/auth');
+const { note } = require('../middleware/activity');
 
 // Clearing data is restricted to the Super Admin
 router.use(requireAuth, requireSuperAdmin);
@@ -87,6 +88,7 @@ router.post('/clear', async (req, res) => {
 
     await client.query('COMMIT');
     console.log(`[admin] ${req.user.username} cleared ${target}: ${result}`);
+    note(res, { action: 'data_clear', entity: target, summary: `Cleared data (${target}): ${result}` });
     res.json({ ok: true, message: result });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -207,6 +209,7 @@ router.post('/import', async (req, res) => {
     const message = `Imported ${eqMap.size} equipment, ${clMap.size} client(s), ${rentalCount} rental(s) and ${paymentCount} payment(s).`
       + (skipped.length ? ` Skipped ${skipped.length}: ${skipped.slice(0,5).join('; ')}${skipped.length > 5 ? '…' : ''}` : '');
     console.log(`[admin] ${req.user.username} imported offline backup: ${message}`);
+    note(res, { action: 'data_import', entity: 'backup', summary: `Imported offline backup${backup.exportedAt ? ' from ' + String(backup.exportedAt).slice(0,10) : ''}: ${message}` });
     res.json({ ok: true, message });
   } catch (err) {
     await client.query('ROLLBACK');

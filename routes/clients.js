@@ -3,6 +3,7 @@ const db     = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { protectClient, isAdminRole } = require('../middleware/privacy');
 const { checkClientIds } = require('../middleware/clientRules');
+const { note, diff } = require('../middleware/activity');
 
 // A Ghana Card can only belong to one client
 async function ghanaCardTaken(card, exceptId = 0) {
@@ -55,6 +56,8 @@ router.post('/', requireAdmin, async (req, res) => {
       [name, phone||null, email||null, company||null, id_number||null,
        ghana_card||null, notes||null, joined||new Date().toISOString().slice(0,10)]
     );
+    note(res, { action: 'client_create', entity: 'client', entity_id: rows[0].id, client_id: rows[0].id,
+      summary: `Added client ${rows[0].name} (${rows[0].phone}, ${rows[0].ghana_card})` });
     res.status(201).json(rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -80,10 +83,14 @@ router.patch('/:id', requireAdmin, async (req, res) => {
 
   vals.push(req.params.id);
   try {
+    const { rows: [before] } = await db.query('SELECT * FROM clients WHERE id=$1', [req.params.id]);
     const { rows } = await db.query(
       `UPDATE clients SET ${updates.join(',')} WHERE id=$${i} RETURNING *`, vals
     );
     if (!rows.length) return res.status(404).json({ error: 'Client not found' });
+    const changes = diff(before, rows[0], ['name','phone','email','company','id_number','ghana_card','notes']);
+    if (changes.length) note(res, { action: 'client_update', entity: 'client', entity_id: rows[0].id, client_id: rows[0].id, changes,
+      summary: `Edited client ${rows[0].name}: ` + changes.map(c => `${c.field} ${c.from} → ${c.to}`).join('; ') });
     res.json(rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -91,8 +98,11 @@ router.patch('/:id', requireAdmin, async (req, res) => {
 // DELETE /api/clients/:id
 router.delete('/:id', requireAdmin, async (req, res) => {
   try {
-    const { rowCount } = await db.query('DELETE FROM clients WHERE id=$1', [req.params.id]);
-    if (!rowCount) return res.status(404).json({ error: 'Client not found' });
+    const { rows: gone } = await db.query('DELETE FROM clients WHERE id=$1 RETURNING *', [req.params.id]);
+    if (!gone.length) return res.status(404).json({ error: 'Client not found' });
+    note(res, { action: 'client_delete', entity: 'client', entity_id: gone[0].id, client_id: gone[0].id,
+      changes: ['name','phone','email','company','id_number','ghana_card','notes'].filter(f => gone[0][f]).map(f => ({ field: f, from: String(gone[0][f]), to: '(deleted)' })),
+      summary: `Deleted client ${gone[0].name} (${gone[0].phone || 'no phone'}, ${gone[0].ghana_card || 'no Ghana Card'})` });
     res.json({ ok: true });
   } catch (err) {
     if (err.code === '23503') return res.status(409).json({ error: 'Client has existing rentals' });

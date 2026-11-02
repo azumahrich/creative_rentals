@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const db     = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { note, diff, money } = require('../middleware/activity');
 
 /*
  * Photos are stored in the database (table equipment_photos), not on disk,
@@ -63,6 +64,9 @@ router.post('/', requireAdmin, async (req, res) => {
       [serial||null, name, category, price||0, deposit||0,
        available !== undefined ? Math.min(tot, Math.max(0, parseInt(available) || 0)) : tot, tot]
     );
+    const e = rows[0];
+    note(res, { action: 'equipment_create', entity: 'equipment', entity_id: e.id,
+      summary: `Added equipment ${e.name}${e.serial ? ' (' + e.serial + ')' : ''} — ${e.total} × ${e.category}, ${money(e.price)}/day, deposit ${money(e.deposit)}` });
     res.status(201).json(rows[0]);
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'Serial number already exists' });
@@ -75,7 +79,7 @@ router.post('/', requireAdmin, async (req, res) => {
 // currently out on rental stay counted as out.
 router.patch('/:id', requireAdmin, async (req, res) => {
   try {
-    const { rows: found } = await db.query('SELECT total, available FROM equipment WHERE id=$1', [req.params.id]);
+    const { rows: found } = await db.query('SELECT * FROM equipment WHERE id=$1', [req.params.id]);
     if (!found.length) return res.status(404).json({ error: 'Equipment not found' });
     const cur = found[0];
 
@@ -100,6 +104,9 @@ router.patch('/:id', requireAdmin, async (req, res) => {
     vals.push(req.params.id);
     const { rows } = await db.query(
       `UPDATE equipment SET ${updates.join(',')} WHERE id=$${i} RETURNING *`, vals);
+    const changes = diff(cur, rows[0], ['name','serial','category','price','deposit','total']);
+    if (changes.length) note(res, { action: 'equipment_update', entity: 'equipment', entity_id: rows[0].id, changes,
+      summary: `Edited equipment ${rows[0].name}: ` + changes.map(c => `${c.field} ${c.from} → ${c.to}`).join('; ') });
     res.json(rows[0]);
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'Serial number already exists' });
@@ -117,13 +124,16 @@ router.put('/:id/photo', requireAdmin, async (req, res) => {
   if (!data.length) return res.status(400).json({ error: 'The photo is empty' });
   if (data.length > MAX_PHOTO_BYTES) return res.status(413).json({ error: 'Photo is too large (max 1.5 MB)' });
   try {
-    const { rowCount } = await db.query('SELECT 1 FROM equipment WHERE id=$1', [req.params.id]);
-    if (!rowCount) return res.status(404).json({ error: 'Equipment not found' });
+    const { rows: [eq] } = await db.query('SELECT name FROM equipment WHERE id=$1', [req.params.id]);
+    if (!eq) return res.status(404).json({ error: 'Equipment not found' });
+    const { rows: had } = await db.query('SELECT 1 FROM equipment_photos WHERE equipment_id=$1', [req.params.id]);
     const { rows } = await db.query(
       `INSERT INTO equipment_photos (equipment_id, mime, data, updated_at) VALUES ($1,$2,$3,NOW())
        ON CONFLICT (equipment_id) DO UPDATE SET mime=EXCLUDED.mime, data=EXCLUDED.data, updated_at=NOW()
        RETURNING FLOOR(EXTRACT(EPOCH FROM updated_at))::bigint AS photo_v`,
       [req.params.id, mime, data]);
+    note(res, { action: 'equipment_photo', entity: 'equipment', entity_id: Number(req.params.id),
+      summary: `${had.length ? 'Replaced' : 'Added'} photo for ${eq.name}` });
     res.json({ ok: true, photo_v: rows[0].photo_v });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -131,7 +141,11 @@ router.put('/:id/photo', requireAdmin, async (req, res) => {
 // DELETE /api/equipment/:id/photo  (admin only)
 router.delete('/:id/photo', requireAdmin, async (req, res) => {
   try {
-    await db.query('DELETE FROM equipment_photos WHERE equipment_id=$1', [req.params.id]);
+    const { rowCount } = await db.query('DELETE FROM equipment_photos WHERE equipment_id=$1', [req.params.id]);
+    if (rowCount) {
+      const { rows: [eq] } = await db.query('SELECT name FROM equipment WHERE id=$1', [req.params.id]);
+      note(res, { action: 'equipment_photo', entity: 'equipment', entity_id: Number(req.params.id), summary: `Removed photo of ${eq ? eq.name : 'equipment #' + req.params.id}` });
+    }
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -154,10 +168,13 @@ router.delete('/:id', requireAdmin, async (req, res) => {
 
     const { rows: used } = await db.query(
       'SELECT 1 FROM rental_equipment WHERE equipment_id=$1 LIMIT 1', [req.params.id]);
+    const { rows: [eq] } = await db.query('SELECT name, serial, total FROM equipment WHERE id=$1', [req.params.id]);
     const { rowCount } = used.length
       ? await db.query('UPDATE equipment SET archived=TRUE WHERE id=$1 AND NOT archived', [req.params.id])
       : await db.query('DELETE FROM equipment WHERE id=$1', [req.params.id]);
     if (!rowCount) return res.status(404).json({ error: 'Equipment not found' });
+    note(res, { action: 'equipment_delete', entity: 'equipment', entity_id: Number(req.params.id),
+      summary: `Removed equipment ${eq.name}${eq.serial ? ' (' + eq.serial + ')' : ''} — ${eq.total} unit(s)` });
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

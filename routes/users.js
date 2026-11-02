@@ -2,6 +2,8 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const db     = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { note, diff } = require('../middleware/activity');
+const ROLE_NAME = { superadmin:'Super Admin', admin:'Admin', staff:'Staff' };
 
 /*
  * Who can do what:
@@ -33,7 +35,7 @@ async function activeSuperCount(excludeId) {
 router.get('/', async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT id, username, name, role, active, created_at FROM users
+      `SELECT id, username, name, role, active, created_at, last_login_at, last_seen_at FROM users
        ORDER BY CASE role WHEN 'superadmin' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, id`);
     res.json(rows.map(u => ({ ...u, can_manage: canManage(req.user, u) })));
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -55,6 +57,8 @@ router.post('/', async (req, res) => {
        VALUES ($1,$2,$3,$4) RETURNING id, username, name, role, active, created_at`,
       [username.trim().toLowerCase(), hash, name.trim(), role]
     );
+    note(res, { action: 'user_create', entity: 'user', entity_id: rows[0].id,
+      summary: `Created ${ROLE_NAME[role]} account "${rows[0].username}" (${rows[0].name})` });
     res.status(201).json(rows[0]);
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'Username already exists' });
@@ -67,7 +71,7 @@ router.patch('/:id', async (req, res) => {
   const id = Number(req.params.id);
   const self = id === req.user.id;
   try {
-    const { rows: found } = await db.query('SELECT id, role, active FROM users WHERE id=$1', [id]);
+    const { rows: found } = await db.query('SELECT id, username, name, role, active FROM users WHERE id=$1', [id]);
     if (!found.length) return res.status(404).json({ error: 'User not found' });
     const target = found[0];
     if (!canManage(req.user, target))
@@ -99,6 +103,12 @@ router.patch('/:id', async (req, res) => {
     vals.push(id);
     const { rows } = await db.query(
       `UPDATE users SET ${updates.join(',')} WHERE id=$${i} RETURNING id, username, name, role, active`, vals);
+    const changes = diff({ ...target, role: ROLE_NAME[target.role] }, { ...rows[0], role: ROLE_NAME[rows[0].role] }, ['name','role','active']);
+    if (password) changes.push({ field: 'Password', from: '••••', to: self ? 'changed' : 'reset by ' + req.user.username });
+    const what = changes.map(c => c.field === 'Password' ? (self ? 'changed password' : 'reset password')
+      : c.field === 'Status' ? (c.to === 'Active' ? 'enabled the account' : 'disabled the account') : `${c.field.toLowerCase()} ${c.from} → ${c.to}`);
+    if (changes.length) note(res, { action: 'user_update', entity: 'user', entity_id: id, changes,
+      summary: `Updated user "${target.username}": ${what.join(', ')}` });
     res.json(rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -108,7 +118,7 @@ router.delete('/:id', async (req, res) => {
   const id = Number(req.params.id);
   if (id === req.user.id) return res.status(400).json({ error: 'Cannot delete your own account' });
   try {
-    const { rows: found } = await db.query('SELECT id, role, active FROM users WHERE id=$1', [id]);
+    const { rows: found } = await db.query('SELECT id, username, name, role, active FROM users WHERE id=$1', [id]);
     if (!found.length) return res.status(404).json({ error: 'User not found' });
     const target = found[0];
     if (!canManage(req.user, target))
@@ -116,6 +126,8 @@ router.delete('/:id', async (req, res) => {
     if (target.role === 'superadmin' && (await activeSuperCount(id)) === 0)
       return res.status(400).json({ error: 'There must be at least one active Super Admin' });
     await db.query('DELETE FROM users WHERE id=$1', [id]);
+    note(res, { action: 'user_delete', entity: 'user', entity_id: id,
+      summary: `Removed ${ROLE_NAME[target.role]} account "${target.username}" (${target.name})` });
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

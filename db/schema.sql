@@ -175,3 +175,41 @@ BEGIN
     INSERT INTO app_meta (key, value) VALUES ('bookings_upgrade_v1', NOW()::text);
   END IF;
 END $$;
+
+-- ─── Activity log (Super Admin) ──────────────────────────────────────────────
+-- Who did what, when, from which device. Entries can't be edited or deleted
+-- (enforced by the database itself); only entries older than 2 years are tidied away.
+CREATE TABLE IF NOT EXISTS activity_log (
+  id         BIGSERIAL PRIMARY KEY,
+  at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  user_id    INTEGER,
+  username   TEXT,
+  user_name  TEXT,
+  role       TEXT,
+  action     TEXT NOT NULL,
+  entity     TEXT,
+  entity_id  INTEGER,
+  client_id  INTEGER,
+  summary    TEXT NOT NULL,
+  changes    JSONB,
+  ip         TEXT,
+  device     TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_activity_at     ON activity_log(at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_user   ON activity_log(user_id, at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_client ON activity_log(client_id, at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_entity ON activity_log(entity, entity_id);
+
+CREATE OR REPLACE FUNCTION activity_log_protect() RETURNS trigger AS $$
+BEGIN
+  IF TG_OP = 'DELETE' AND OLD.at < NOW() - INTERVAL '2 years' THEN RETURN OLD; END IF;
+  RAISE EXCEPTION 'Activity log entries cannot be changed or deleted';
+END $$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS activity_log_no_edit ON activity_log;
+CREATE TRIGGER activity_log_no_edit BEFORE UPDATE OR DELETE ON activity_log
+  FOR EACH ROW EXECUTE FUNCTION activity_log_protect();
+DELETE FROM activity_log WHERE at < NOW() - INTERVAL '2 years';
+
+-- When each person last signed in / was last active
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at  TIMESTAMPTZ;

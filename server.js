@@ -4,6 +4,7 @@ const cors    = require('cors');
 const path    = require('path');
 
 const app = express();
+app.set('trust proxy', 1);   // Render sits in front of the app; this gives the real visitor IP for the activity log
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors());
@@ -11,6 +12,7 @@ app.use(express.json({ limit: '20mb' }));   // large enough for backup imports
 app.use(express.urlencoded({ extended: true }));
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
+app.use('/api', require('./middleware/activity').activityRecorder);
 app.use('/api/auth',      require('./routes/auth'));
 app.use('/api/users',     require('./routes/users'));
 app.use('/api/clients',   require('./routes/clients'));
@@ -19,6 +21,7 @@ app.use('/api/rentals',   require('./routes/rentals'));
 app.use('/api/payments',  require('./routes/payments'));
 app.use('/api/reports',   require('./routes/reports'));
 app.use('/api/admin',     require('./routes/admin'));
+app.use('/api/activity',  require('./routes/activity'));
 
 // ─── Serve Frontend ───────────────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, 'public')));
@@ -117,6 +120,9 @@ async function emergencySuperAdminReset() {
   await db.query(
     "INSERT INTO app_meta (key, value) VALUES ('superadmin_reset', $1) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value", [fingerprint]);
   console.log(`[recovery] Password reset for Super Admin "${target.username}". Log in now, then REMOVE RESET_SUPERADMIN_PASSWORD from the Environment settings.`);
+  await require('./middleware/activity').write({ action: 'emergency_reset', entity: 'user', entity_id: target.id,
+    username: 'render', user_name: 'Render settings', role: 'system', device: 'Server',
+    summary: `Emergency password reset for Super Admin "${target.username}" (via Render Environment settings)` });
 }
 
 setupDatabase()
