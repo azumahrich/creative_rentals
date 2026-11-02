@@ -27,7 +27,10 @@ router.use(requireAuth);
 
 const LIST_SQL = `
   SELECT e.*, (p.equipment_id IS NOT NULL) AS has_photo,
-         COALESCE(FLOOR(EXTRACT(EPOCH FROM p.updated_at))::bigint, 0) AS photo_v
+         COALESCE(FLOOR(EXTRACT(EPOCH FROM p.updated_at))::bigint, 0) AS photo_v,
+         COALESCE((SELECT SUM(re.qty) FROM rental_equipment re JOIN rentals r ON r.id = re.rental_id
+                   WHERE re.equipment_id = e.id AND r.status = 'booked'
+                     AND r.end_date >= (NOW() AT TIME ZONE 'Africa/Accra')::date), 0)::int AS booked_ahead
   FROM equipment e
   LEFT JOIN equipment_photos p ON p.equipment_id = e.id`;
 
@@ -140,10 +143,14 @@ router.delete('/:id/photo', requireAdmin, async (req, res) => {
 router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     const { rows: out } = await db.query(
-      `SELECT r.id FROM rental_equipment re JOIN rentals r ON r.id = re.rental_id
-       WHERE re.equipment_id=$1 AND r.status IN ('active','overdue') LIMIT 1`, [req.params.id]);
-    if (out.length)
-      return res.status(409).json({ error: `This item is out on rental #R-${String(out[0].id).padStart(4,'0')}. Mark that rental Returned first.` });
+      `SELECT r.id, r.status FROM rental_equipment re JOIN rentals r ON r.id = re.rental_id
+       WHERE re.equipment_id=$1 AND r.status IN ('active','overdue','booked') ORDER BY r.status='booked' LIMIT 1`, [req.params.id]);
+    if (out.length) {
+      const n = `#R-${String(out[0].id).padStart(4,'0')}`;
+      return res.status(409).json({ error: out[0].status === 'booked'
+        ? `This item is booked on ${n}. Cancel that booking first.`
+        : `This item is out on rental ${n}. Mark that rental Returned first.` });
+    }
 
     const { rows: used } = await db.query(
       'SELECT 1 FROM rental_equipment WHERE equipment_id=$1 LIMIT 1', [req.params.id]);

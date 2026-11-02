@@ -77,7 +77,7 @@ select option{background:var(--card)}
 .btn-secondary:hover{border-color:var(--accent);color:var(--accent)}
 .btn-danger{background:#7f1d1d;color:#fca5a5;border:none}
 .btn-danger:hover{background:var(--red);color:#fff}
-.btn-sm{padding:5px 12px;font-size:.8rem}
+.btn-sm{padding:5px 12px;font-size:.8rem;white-space:nowrap}
 .btn-icon{padding:6px;border-radius:6px;background:var(--input-bg);border:1px solid var(--border);color:var(--text-dim);cursor:pointer;transition:.2s}
 .btn-icon:hover{border-color:var(--accent);color:var(--accent)}
 
@@ -102,6 +102,9 @@ tr:hover td{background:rgba(255,255,255,.025)}
 .badge-returned{background:#1e3a5f;color:#60a5fa}
 .badge-overdue{background:#7f1d1d;color:#fca5a5}
 .badge-cancelled{background:#374151;color:#9ca3af}
+.badge-booked{background:#3b2a6b;color:#c4b5fd}
+.booking-note{background:#2a2350;border:1px solid #4c3d8f;color:#ddd6fe;border-radius:10px;padding:10px 14px;font-size:.86rem;margin-top:10px;line-height:1.45}
+.sub-note{display:block;font-size:.72rem;color:var(--text-dim);margin-top:3px}
 .badge-admin{background:#4c1d95;color:#c4b5fd}
 .badge-staff{background:#1e3a5f;color:#93c5fd}
 .badge-superadmin{background:#7c2d12;color:#fdba74}
@@ -454,6 +457,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
       <button class="btn btn-secondary btn-sm" onclick="addEquipmentRow()">+ Add Item</button>
     </div>
     <div class="form-group"><label>Notes</label><textarea id="rnt-notes" rows="2" placeholder="Any additional notes…"></textarea></div>
+    <div id="rnt-booking-note" class="booking-note" style="display:none"></div>
     <div id="rnt-total-row" style="text-align:right;font-weight:700;color:var(--accent);margin-top:8px;font-size:1.05rem"></div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-rental')">Cancel</button>
@@ -792,7 +796,7 @@ function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
 function statusBadge(s) {
-  const map = { active:'badge-active', returned:'badge-returned', overdue:'badge-overdue', cancelled:'badge-cancelled' };
+  const map = { booked:'badge-booked', active:'badge-active', returned:'badge-returned', overdue:'badge-overdue', cancelled:'badge-cancelled' };
   return `<span class="badge ${map[s]||'badge-returned'}">${s}</span>`;
 }
 
@@ -803,6 +807,21 @@ async function renderDashboard() {
   try {
     const stats = await GET('/api/reports/dashboard');
     const recentRentals = await GET('/api/rentals?status=active');
+    const bookings = await GET('/api/rentals?status=booked');
+    const t = today(), soon = new Date(Date.now() + 7*86400000).toISOString().slice(0,10);
+    const upcoming = bookings.filter(r => r.end_date >= t && r.start_date <= soon);
+    const pickupRows = upcoming.map(r => {
+      const due = r.start_date <= t;
+      return `<tr>
+        <td>#R-${String(r.id).padStart(4,'0')}</td>
+        <td>${r.client_name||'—'}</td>
+        <td>${(r.equipment||[]).map(e => e.qty>1 ? e.qty+' × '+e.name : e.name).join(', ')}</td>
+        <td>${due ? '<strong class="text-accent">Today</strong>' : fmtDate(r.start_date)}</td>
+        <td><div class="flex gap-2">
+          <button class="btn-icon btn-sm" title="Booking" onclick="showInvoice(${r.id})">📄</button>
+          ${due ? `<button class="btn btn-primary btn-sm" onclick="pickupRental(${r.id})">🤝 Picked up</button>` : ''}
+        </div></td>
+      </tr>`; }).join('');
 
     let recent = '';
     recentRentals.slice(0,5).forEach(r => {
@@ -821,10 +840,24 @@ async function renderDashboard() {
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Active Rentals</div><div class="stat-value text-accent">${stats.active_rentals}</div></div>
         <div class="stat-card"><div class="stat-label">Overdue</div><div class="stat-value text-red">${stats.overdue_rentals}</div></div>
+        <div class="stat-card"><div class="stat-label">Pickups Today</div><div class="stat-value" style="color:#c4b5fd">${stats.pickups_today||0}</div><div class="stat-sub">bookings to hand over</div></div>
+        <div class="stat-card"><div class="stat-label">Booked Ahead</div><div class="stat-value" style="color:#c4b5fd">${stats.booked_rentals||0}</div></div>
         <div class="stat-card"><div class="stat-label">Total Clients</div><div class="stat-value">${stats.total_clients}</div></div>
         <div class="stat-card"><div class="stat-label">Equipment Items</div><div class="stat-value">${stats.total_equipment}</div></div>
         ${isAdmin() ? `<div class="stat-card"><div class="stat-label">This Month Revenue</div><div class="stat-value text-green">${ghc(stats.month_revenue)}</div><div class="stat-sub">collected</div></div>
         <div class="stat-card"><div class="stat-label">Outstanding</div><div class="stat-value text-red">${ghc(stats.outstanding)}</div><div class="stat-sub">unpaid balance</div></div>` : ''}
+      </div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <span class="card-title">📅 Upcoming Pickups — next 7 days</span>
+          <button class="btn btn-secondary btn-sm" onclick="navigate('rentals'); setTimeout(()=>{ const f=document.getElementById('rnt-filter'); if(f){ f.value='booked'; filterRentalsByStatus('booked'); } }, 700)">All bookings</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>Client</th><th>Equipment</th><th>Pickup</th><th></th></tr></thead>
+            <tbody>${pickupRows || '<tr><td colspan="5" class="empty">No bookings in the next 7 days</td></tr>'}</tbody>
+          </table>
+        </div>
       </div>
       <div class="card">
         <div class="card-header">
@@ -900,6 +933,8 @@ function rentalActions(r) {
   return `<div class="flex gap-2">
     <button class="btn-icon btn-sm" title="Invoice" onclick="showInvoice(${r.id})">📄</button>
     <button class="btn-icon btn-sm" title="Record payment" onclick="openPaymentModal(${r.id},'${(r.client_name||'').replace(/'/g,"\\'")}',${(+r.subtotal)+(+r.deposit_amt)},${r.total_paid})">💰</button>
+    ${r.status==='booked' ? `<button class="btn btn-primary btn-sm" title="Picked up" onclick="pickupRental(${r.id})">🤝 Picked up</button>` : ''}
+    ${isAdmin() && r.status==='booked' ? `<button class="btn-icon btn-sm" title="Cancel booking" onclick="cancelBooking(${r.id})">✖️</button>` : ''}
     ${isAdmin() && (r.status==='active'||r.status==='overdue') ? `<button class="btn-icon btn-sm" title="Mark Returned" onclick="markReturned(${r.id})">✅</button>` : ''}
     ${isAdmin() ? `<button class="btn-icon btn-sm" title="Delete" onclick="deleteRental(${r.id})">🗑️</button>` : ''}
   </div>`;
@@ -1027,7 +1062,7 @@ function drawEquipment() {
         <td>${e.category}</td>
         <td>${ghc(e.price)}/day</td>
         <td>${ghc(e.deposit)}</td>
-        <td><span class="badge ${e.available>0?'badge-active':'badge-overdue'}">${e.available}/${e.total}</span></td>
+        <td><span class="badge ${e.available>0?'badge-active':'badge-overdue'}">${e.available}/${e.total}</span>${e.booked_ahead ? `<span class="sub-note">📅 ${e.booked_ahead} booked ahead</span>` : ''}</td>
         ${isAdmin()?`<td><div class="flex gap-2">
           <button class="btn-icon btn-sm" title="Edit" onclick="openEqModal(${e.id})">✏️</button>
           <button class="btn-icon btn-sm" title="Delete" onclick="deleteEq(${e.id},'${e.name.replace(/'/g,"\\'")}')">🗑️</button>
@@ -1149,6 +1184,7 @@ async function renderRentals() {
       <div class="toolbar">
         <select id="rnt-filter" onchange="filterRentalsByStatus(this.value)" style="width:160px">
           <option value="">All statuses</option>
+          <option value="booked">Booked (upcoming)</option>
           <option value="active">Active</option>
           <option value="returned">Returned</option>
           <option value="overdue">Overdue</option>
@@ -1201,16 +1237,51 @@ async function openRentalModal() {
   sel.innerHTML = '<option value="">— select client —</option>' +
     clients.map(c => `<option value="${c.id}">${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('');
 
-  // Ensure equipment is loaded
-  if (!_allEquipment.length) _allEquipment = await GET('/api/equipment');
+  // Always use fresh stock figures, then work out what's free on the chosen dates
+  _allEquipment = await GET('/api/equipment');
+  await refreshAvailability(false);
   addEquipmentRow();
   openModal('modal-rental');
 }
 
+// How many of each item are free for the chosen dates (other bookings + equipment out)
+let _avail = null, _availToday = today(), _availSeq = 0;
+async function refreshAvailability(redraw = true) {
+  const from = document.getElementById('rnt-start').value;
+  const endEl = document.getElementById('rnt-end');
+  if (!from) return;
+  if (!endEl.value || endEl.value < from) endEl.value = from;
+  const seq = ++_availSeq;
+  try {
+    const r = await GET(`/api/rentals/availability?from=${from}&to=${endEl.value}`);
+    if (seq !== _availSeq) return;          // a newer date change is already loading
+    _avail = r.items; _availToday = r.today;
+  } catch { _avail = null; }
+  const note = document.getElementById('rnt-booking-note');
+  document.querySelector('#modal-rental .modal-footer .btn-primary').textContent = from > _availToday ? 'Create Booking' : 'Create Rental';
+  if (from > _availToday) {
+    note.style.display = '';
+    note.innerHTML = `📅 This will be saved as a <strong>booking</strong> for ${fmtDate(from)}. The equipment is reserved for these dates and is
+      only taken out of stock when the client collects it — tap <strong>🤝 Picked up</strong> on that day.`;
+  } else note.style.display = 'none';
+  if (redraw) document.querySelectorAll('#rnt-eq-list > .eq-pick').forEach(row => {
+    const item = row.querySelector('.eq-item'), keep = item.value;
+    item.innerHTML = eqOptions(row.querySelector('.eq-cat').value);
+    const o = [...item.options].find(x => x.value === keep && !x.disabled) || [...item.options].find(x => !x.disabled);
+    if (o) item.value = o.value;
+    syncQtyMax(item);
+  });
+  calcRentalTotal();
+}
+function freeFor(e) { return _avail && _avail[e.id] !== undefined ? _avail[e.id] : e.available; }
+
 function eqOptions(cat) {
-  return _allEquipment.filter(e => !cat || e.category === cat).map(e =>
-    `<option value="${e.id}" data-price="${e.price}" data-deposit="${e.deposit}" data-avail="${e.available}"${e.available>0?'':' disabled'}>${e.name} — ${ghc(e.price)}/day${e.available>0?` · ${e.available} left`:' · none left'}</option>`
-  ).join('') || '<option value="" disabled>No items in this category</option>';
+  const future = (document.getElementById('rnt-start').value || '') > _availToday;
+  return _allEquipment.filter(e => !cat || e.category === cat).map(e => {
+    const f = freeFor(e);
+    const label = f > 0 ? (future ? ` · ${f} free on these dates` : ` · ${f} left`) : (future ? ' · booked for these dates' : ' · none left');
+    return `<option value="${e.id}" data-price="${e.price}" data-deposit="${e.deposit}" data-avail="${f}"${f>0?'':' disabled'}>${e.name} — ${ghc(e.price)}/day${label}</option>`;
+  }).join('') || '<option value="" disabled>No items in this category</option>';
 }
 
 function addEquipmentRow() {
@@ -1309,20 +1380,39 @@ async function saveRental() {
   equipment.forEach(e => { wanted[e.equipment_id] = (wanted[e.equipment_id] || 0) + e.qty; });
   for (const [id, n] of Object.entries(wanted)) {
     const eq = _allEquipment.find(x => x.id == id);
-    if (eq && n > eq.available) { toast(`Only ${eq.available} × ${eq.name} available`, 'error'); return; }
+    if (eq && n > freeFor(eq)) { toast(`Only ${freeFor(eq)} × ${eq.name} free for these dates`, 'error'); return; }
   }
 
   try {
-    await POST('/api/rentals', {
+    const made = await POST('/api/rentals', {
       client_id: parseInt(client_id), rental_date, return_date,
       equipment,
       notes: document.getElementById('rnt-notes').value || null
     });
     closeModal('modal-rental');
-    toast('Rental created');
+    toast(made.status === 'booked' ? `Booked for ${fmtDate(made.start_date)} — tap 🤝 Picked up when the client collects` : 'Rental created');
     _allEquipment = []; // refresh availability
     renderRentals();
   } catch (err) { toast(err.message,'error'); }
+}
+
+async function pickupRental(id) {
+  if (!confirm('Client has collected the equipment for #R-'+String(id).padStart(4,'0')+'?')) return;
+  try {
+    await POST(`/api/rentals/${id}/pickup`, {});
+    toast('Picked up — rental is now active');
+    _allEquipment = [];
+    _page === 'dashboard' ? renderDashboard() : renderRentals();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function cancelBooking(id) {
+  if (!confirm('Cancel booking #R-'+String(id).padStart(4,'0')+'? The dates will be freed for other clients.')) return;
+  try {
+    await POST(`/api/rentals/${id}/cancel`, {});
+    toast('Booking cancelled');
+    _page === 'dashboard' ? renderDashboard() : renderRentals();
+  } catch (err) { toast(err.message, 'error'); }
 }
 
 async function markReturned(id) {
@@ -1436,7 +1526,7 @@ async function showInvoice(id) {
           </div>
         </div>
         <div class="invoice-title">
-          <h2>RENTAL INVOICE</h2>
+          <h2>${r.status === 'booked' ? 'BOOKING CONFIRMATION' : 'RENTAL INVOICE'}</h2>
           <p style="color:#888;font-size:.82rem">#R-${String(r.id).padStart(4,'0')}</p>
           <p style="font-size:.82rem">Date: ${fmtDate(new Date())}</p>
         </div>
@@ -1514,7 +1604,7 @@ function shareWhatsApp() {
   const balance = subtotal + deposit - paid;
 
   const items = (r.equipment||[]).map(e => `  • ${e.name} x${e.qty} @ ${ghc(e.unit_price)}${(r.days||1)>1?'/day':''}`).join('\n');
-  const text = `*CREATIVE RENTALS — Invoice #R-${String(r.id).padStart(4,'0')}*\n` +
+  const text = `*CREATIVE RENTALS — ${r.status === 'booked' ? 'Booking' : 'Invoice'} #R-${String(r.id).padStart(4,'0')}*\n` +
     `Adum-Kumasi, Opposite Oyerepa FM & Bosheba Building\n` +
     `Tel: 0241 334 486 | 024 816 4307\n\n` +
     `*Client:* ${r.client_name||'—'}\n` +
@@ -1601,6 +1691,7 @@ async function loadReport() {
         <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value text-accent">${s.active_rentals}</div></div>
         <div class="stat-card"><div class="stat-label">Returned</div><div class="stat-value text-green">${s.returned_rentals}</div></div>
         <div class="stat-card"><div class="stat-label">Overdue</div><div class="stat-value text-red">${s.overdue_rentals}</div></div>
+        <div class="stat-card"><div class="stat-label">Booked (upcoming)</div><div class="stat-value" style="color:#c4b5fd">${s.booked_rentals||0}</div></div>
         <div class="stat-card"><div class="stat-label">Gross Revenue</div><div class="stat-value">${ghc(s.gross_revenue)}</div></div>
         <div class="stat-card"><div class="stat-label">Collected</div><div class="stat-value text-green">${ghc(s.collected)}</div></div>
         <div class="stat-card"><div class="stat-label">Outstanding</div><div class="stat-value text-red">${ghc(s.outstanding)}</div></div>
@@ -1863,8 +1954,8 @@ async function doClear() {
 // ═══════════════════════════════════════════════════════════════════
 (async function init() {
   // Date inputs: calc days on change
-  document.getElementById('rnt-start').addEventListener('change', calcRentalTotal);
-  document.getElementById('rnt-end').addEventListener('change', calcRentalTotal);
+  document.getElementById('rnt-start').addEventListener('change', () => refreshAvailability());
+  document.getElementById('rnt-end').addEventListener('change', () => refreshAvailability());
 
   if (_token) {
     await bootApp();

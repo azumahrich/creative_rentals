@@ -1,11 +1,12 @@
 const router = require('express').Router();
 const db     = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 router.use(requireAuth);
 
 // GET /api/payments?rental_id=X
-router.get('/', async (req, res) => {
+// Staff can record payments; payment history and deleting payments are admin-only
+router.get('/', requireAdmin, async (req, res) => {
   const { rental_id } = req.query;
   try {
     const sql = rental_id
@@ -48,7 +49,7 @@ router.post('/', async (req, res) => {
 });
 
 // DELETE /api/payments/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   const client = await db.connect();
   try {
     await client.query('BEGIN');

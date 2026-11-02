@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const db     = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 router.use(requireAuth);
 
@@ -8,7 +8,7 @@ router.use(requireAuth);
  * GET /api/reports/summary
  * Query params: from, to, client_id, equipment_id
  */
-router.get('/summary', async (req, res) => {
+router.get('/summary', requireAdmin, async (req, res) => {
   const { from, to, client_id, equipment_id } = req.query;
 
   const where  = ['1=1'];
@@ -33,9 +33,10 @@ router.get('/summary', async (req, res) => {
         COUNT(*) FILTER (WHERE status='active')   AS active_rentals,
         COUNT(*) FILTER (WHERE status='returned') AS returned_rentals,
         COUNT(*) FILTER (WHERE status='overdue')  AS overdue_rentals,
-        COALESCE(SUM(subtotal),0)              AS gross_revenue,
+        COUNT(*) FILTER (WHERE status='booked')   AS booked_rentals,
+        COALESCE(SUM(subtotal) FILTER (WHERE status <> 'cancelled'),0) AS gross_revenue,
         COALESCE(SUM(total_paid),0)            AS collected,
-        COALESCE(SUM(subtotal + deposit_amt - total_paid),0) AS outstanding
+        COALESCE(SUM(subtotal + deposit_amt - total_paid) FILTER (WHERE status <> 'cancelled'),0) AS outstanding
       FROM rentals r
       WHERE ${cond}
     `, params);
@@ -87,11 +88,17 @@ router.get('/dashboard', async (req, res) => {
         (SELECT COUNT(*) FROM equipment WHERE NOT archived)   AS total_equipment,
         (SELECT COUNT(*) FROM rentals WHERE status='active')   AS active_rentals,
         (SELECT COUNT(*) FROM rentals WHERE status='overdue')  AS overdue_rentals,
+        (SELECT COUNT(*) FROM rentals WHERE status='booked')   AS booked_rentals,
+        (SELECT COUNT(*) FROM rentals WHERE status='booked'
+           AND start_date <= (NOW() AT TIME ZONE 'Africa/Accra')::date
+           AND end_date   >= (NOW() AT TIME ZONE 'Africa/Accra')::date) AS pickups_today,
         (SELECT COALESCE(SUM(amount),0) FROM payments
          WHERE paid_at >= date_trunc('month', CURRENT_DATE)) AS month_revenue,
         (SELECT COALESCE(SUM(subtotal+deposit_amt-total_paid),0) FROM rentals
          WHERE status IN ('active','overdue'))                  AS outstanding
     `);
+    // Staff don't see money totals on the dashboard
+    if (!['admin','superadmin'].includes(req.user.role)) { delete stats.month_revenue; delete stats.outstanding; }
     res.json(stats);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

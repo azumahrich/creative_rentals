@@ -9,7 +9,7 @@ let useSSL = process.env.NODE_ENV === 'production' && process.env.DATABASE_SSL !
 
 function makePool() {
   const p = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: (process.env.DATABASE_URL || '').trim(),   // trim stray spaces from copy-paste
     ssl: useSSL ? { rejectUnauthorized: false } : false,
     max: 10,
     idleTimeoutMillis: 30000,

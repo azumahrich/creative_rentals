@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS rentals (
   start_date   DATE NOT NULL,
   end_date     DATE NOT NULL,
   days         INTEGER NOT NULL DEFAULT 1,
-  status       TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','returned','overdue','cancelled')),
+  status       TEXT NOT NULL DEFAULT 'active',
   subtotal     NUMERIC(12,2) NOT NULL DEFAULT 0,
   deposit_amt  NUMERIC(12,2) NOT NULL DEFAULT 0,
   total_paid   NUMERIC(12,2) NOT NULL DEFAULT 0,
@@ -151,3 +151,27 @@ CREATE INDEX IF NOT EXISTS idx_rentals_status   ON rentals(status);
 CREATE INDEX IF NOT EXISTS idx_rentals_dates    ON rentals(start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_re_rental        ON rental_equipment(rental_id);
 CREATE INDEX IF NOT EXISTS idx_payments_rental  ON payments(rental_id);
+CREATE INDEX IF NOT EXISTS idx_re_equipment     ON rental_equipment(equipment_id);
+
+-- ─── Advance bookings ────────────────────────────────────────────────────────
+-- 'booked' = reserved for a future date; doesn't take stock until picked up
+ALTER TABLE rentals DROP CONSTRAINT IF EXISTS rentals_status_check;
+ALTER TABLE rentals ADD CONSTRAINT rentals_status_check
+  CHECK (status IN ('booked','active','returned','overdue','cancelled'));
+
+-- One-time upgrade: rentals entered for a FUTURE date before bookings existed were
+-- saved as 'active' and took stock immediately. Turn them into bookings and put the stock back.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_meta WHERE key = 'bookings_upgrade_v1') THEN
+    UPDATE equipment e SET available = LEAST(e.total, e.available + x.qty)
+    FROM (SELECT re.equipment_id, SUM(re.qty)::int AS qty
+          FROM rentals r JOIN rental_equipment re ON re.rental_id = r.id
+          WHERE r.status = 'active' AND r.start_date > (NOW() AT TIME ZONE 'Africa/Accra')::date
+          GROUP BY re.equipment_id) x
+    WHERE e.id = x.equipment_id;
+    UPDATE rentals SET status = 'booked'
+    WHERE status = 'active' AND start_date > (NOW() AT TIME ZONE 'Africa/Accra')::date;
+    INSERT INTO app_meta (key, value) VALUES ('bookings_upgrade_v1', NOW()::text);
+  END IF;
+END $$;

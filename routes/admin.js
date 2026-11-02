@@ -17,7 +17,7 @@ router.get('/counts', async (req, res) => {
         (SELECT COUNT(*) FROM clients)::int  AS clients,
         (SELECT COUNT(*) FROM rentals)::int  AS rentals,
         (SELECT COUNT(*) FROM payments)::int AS payments,
-        (SELECT COUNT(*) FROM rentals WHERE status IN ('active','overdue'))::int AS rentals_out`);
+        (SELECT COUNT(*) FROM rentals WHERE status IN ('active','overdue','booked'))::int AS rentals_out`);
     res.json(c);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -71,10 +71,10 @@ router.post('/clear', async (req, res) => {
 
     } else if (target === 'equipment') {
       const { rows: out } = await client.query(
-        "SELECT COUNT(*)::int AS n FROM rentals WHERE status IN ('active','overdue')");
+        "SELECT COUNT(*)::int AS n FROM rentals WHERE status IN ('active','overdue','booked')");
       if (out[0].n) {
         await client.query('ROLLBACK');
-        return res.status(409).json({ error: `${out[0].n} rental(s) are still out. Mark them Returned first.` });
+        return res.status(409).json({ error: `${out[0].n} rental(s) are still out or booked ahead. Mark them Returned or cancel the bookings first.` });
       }
       // Items used in past rentals are archived so old invoices keep their names; the rest are deleted
       const { rows: [live] } = await client.query(
