@@ -2,6 +2,13 @@ const router = require('express').Router();
 const db     = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { protectClient, isAdminRole } = require('../middleware/privacy');
+const { checkClientIds } = require('../middleware/clientRules');
+
+// A Ghana Card can only belong to one client
+async function ghanaCardTaken(card, exceptId = 0) {
+  const { rows } = await db.query('SELECT name FROM clients WHERE UPPER(ghana_card)=UPPER($1) AND id<>$2 LIMIT 1', [card, exceptId]);
+  return rows[0] ? rows[0].name : null;
+}
 
 router.use(requireAuth);
 
@@ -35,9 +42,13 @@ router.get('/:id', async (req, res) => {
 // POST /api/clients
 // Staff can view clients (to pick one for a rental) but only admins add, edit or delete them
 router.post('/', requireAdmin, async (req, res) => {
+  if (!String(req.body.name || '').trim()) return res.status(400).json({ error: 'Client name required' });
+  const bad = checkClientIds(req.body);
+  if (bad) return res.status(400).json({ error: bad });
   const { name, phone, email, company, id_number, ghana_card, notes, joined } = req.body;
-  if (!name) return res.status(400).json({ error: 'Client name required' });
   try {
+    const owner = await ghanaCardTaken(ghana_card);
+    if (owner) return res.status(409).json({ error: `This Ghana Card is already registered to ${owner}` });
     const { rows } = await db.query(
       `INSERT INTO clients (name, phone, email, company, id_number, ghana_card, notes, joined)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
@@ -50,6 +61,13 @@ router.post('/', requireAdmin, async (req, res) => {
 
 // PATCH /api/clients/:id
 router.patch('/:id', requireAdmin, async (req, res) => {
+  const bad = checkClientIds(req.body, true);
+  if (bad) return res.status(400).json({ error: bad });
+  if (req.body.name !== undefined && !String(req.body.name).trim()) return res.status(400).json({ error: 'Client name required' });
+  if (req.body.ghana_card) {
+    const owner = await ghanaCardTaken(req.body.ghana_card, Number(req.params.id)).catch(() => null);
+    if (owner) return res.status(409).json({ error: `This Ghana Card is already registered to ${owner}` });
+  }
   const fields = ['name','phone','email','company','id_number','ghana_card','notes','joined'];
   const updates = [];
   const vals    = [];

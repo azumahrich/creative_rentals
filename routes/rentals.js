@@ -144,6 +144,13 @@ router.post('/', async (req, res) => {
     wanted.set(id, (wanted.get(id) || 0) + qty);
   }
 
+  // Clients must have a Ghana Card and phone number on file before they can rent
+  const { rows: [cl] } = await db.query('SELECT name, phone, ghana_card FROM clients WHERE id=$1', [client_id]);
+  if (!cl) return res.status(404).json({ error: 'Client not found' });
+  const missing = [!cl.ghana_card && 'Ghana Card number', !cl.phone && 'phone number'].filter(Boolean);
+  if (missing.length)
+    return res.status(400).json({ error: `${cl.name} has no ${missing.join(' or ')} on file. An admin must add it before renting.` });
+
   const pgClient = await db.connect();
   try {
     await pgClient.query('BEGIN');

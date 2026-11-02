@@ -375,7 +375,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
     </div>
     <div class="input-row">
       <div class="form-group"><label>Full Name *</label><input id="cl-name" placeholder="Full name"></div>
-      <div class="form-group"><label>Phone</label><input id="cl-phone" placeholder="0XX XXX XXXX"></div>
+      <div class="form-group"><label>Phone *</label><input id="cl-phone" type="tel" inputmode="tel" placeholder="024 123 4567" onblur="tidyClientIds()"></div>
     </div>
     <div class="input-row">
       <div class="form-group"><label>Email</label><input id="cl-email" type="email" placeholder="email@example.com"></div>
@@ -383,7 +383,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
     </div>
     <div class="input-row">
       <div class="form-group"><label>ID Number</label><input id="cl-idnum" placeholder="ID number"></div>
-      <div class="form-group"><label>Ghana Card Number</label><input id="cl-ghana" placeholder="GHA-XXXXXXXXX-X"></div>
+      <div class="form-group"><label>Ghana Card Number *</label><input id="cl-ghana" placeholder="GHA-123456789-0" autocapitalize="characters" onblur="tidyClientIds()"></div>
     </div>
     <div class="form-group"><label>Notes</label><textarea id="cl-notes" rows="3" placeholder="Any notes…"></textarea></div>
     <div class="modal-footer">
@@ -894,9 +894,9 @@ async function renderClients() {
     clients.forEach(c => {
       rows += `<tr>
         <td>${c.name}</td>
-        <td>${c.phone||'—'}</td>
+        <td>${c.phone||MISSING}</td>
         <td>${c.email||'—'}</td>
-        <td>${c.ghana_card||'—'}</td>
+        <td>${c.ghana_card||MISSING}</td>
         <td>${fmtDate(c.joined)}</td>
         <td>${clientActions(c)}</td>
       </tr>`;
@@ -948,8 +948,8 @@ function filterClients(q) {
   );
   document.getElementById('clients-tbody').innerHTML = rows.map(c => `
     <tr>
-      <td>${c.name}</td><td>${c.phone||'—'}</td><td>${c.email||'—'}</td>
-      <td>${c.ghana_card||'—'}</td><td>${fmtDate(c.joined)}</td>
+      <td>${c.name}</td><td>${c.phone||MISSING}</td><td>${c.email||'—'}</td>
+      <td>${c.ghana_card||MISSING}</td><td>${fmtDate(c.joined)}</td>
       <td>${clientActions(c)}</td>
     </tr>`).join('') || '<tr><td colspan="6" class="empty">No matches</td></tr>';
 }
@@ -976,6 +976,17 @@ async function openClientModal(id) {
   openModal('modal-client');
 }
 
+const MISSING = '<span class="badge badge-overdue" title="Required before this client can rent">⚠ Missing</span>';
+// Same rules as the server: Ghana Card GHA-123456789-0, Ghana phone 0XX XXX XXXX
+function normGhanaCard(v) { const s = String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,''); const m = /^GHA(\d{9})(\d)$/.exec(s); return m ? `GHA-${m[1]}-${m[2]}` : null; }
+function normPhone(v) { let d = String(v||'').replace(/\D/g,''); if (d.startsWith('233') && d.length === 12) d = '0' + d.slice(3); return /^0[235]\d{8}$/.test(d) ? `${d.slice(0,3)} ${d.slice(3,6)} ${d.slice(6)}` : null; }
+function tidyClientIds() {
+  const g = document.getElementById('cl-ghana'), p = document.getElementById('cl-phone');
+  const ng = normGhanaCard(g.value), np = normPhone(p.value);
+  if (ng) g.value = ng; if (np) p.value = np;
+}
+const clientReady = c => !!(c.phone && c.ghana_card);
+
 async function saveClient() {
   const body = {
     name: document.getElementById('cl-name').value.trim(),
@@ -987,6 +998,11 @@ async function saveClient() {
     notes: document.getElementById('cl-notes').value.trim()
   };
   if (!body.name) { toast('Client name is required', 'error'); return; }
+  if (!body.phone)      { toast('Phone number is required', 'error'); document.getElementById('cl-phone').focus(); return; }
+  if (!normPhone(body.phone)) { toast('Phone must be a 10-digit Ghana number, e.g. 024 123 4567', 'error'); document.getElementById('cl-phone').focus(); return; }
+  if (!body.ghana_card) { toast('Ghana Card number is required', 'error'); document.getElementById('cl-ghana').focus(); return; }
+  if (!normGhanaCard(body.ghana_card)) { toast('Ghana Card must look like GHA-123456789-0', 'error'); document.getElementById('cl-ghana').focus(); return; }
+  body.phone = normPhone(body.phone); body.ghana_card = normGhanaCard(body.ghana_card);
   try {
     if (_clientEdit) await PATCH('/api/clients/'+_clientEdit, body);
     else await POST('/api/clients', body);
@@ -1235,7 +1251,9 @@ async function openRentalModal() {
   _allClients = clients;
   const sel = document.getElementById('rnt-client');
   sel.innerHTML = '<option value="">— select client —</option>' +
-    clients.map(c => `<option value="${c.id}">${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('');
+    clients.map(c => clientReady(c)
+      ? `<option value="${c.id}">${c.name} (${c.phone})</option>`
+      : `<option value="${c.id}" disabled>${c.name} — ⚠ Ghana Card / phone missing</option>`).join('');
 
   // Always use fresh stock figures, then work out what's free on the chosen dates
   _allEquipment = await GET('/api/equipment');
