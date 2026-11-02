@@ -1651,32 +1651,78 @@ async function renderReports() {
     <h1 class="page-title">Reports</h1>
     <div class="card" style="margin-bottom:20px">
       <div class="card-title mb-2">Filter</div>
+      <div class="chips" style="margin-bottom:12px">
+        <button class="chip active" data-range="all"   onclick="setReportRange('all')">All time</button>
+        <button class="chip" data-range="month"       onclick="setReportRange('month')">This month</button>
+        <button class="chip" data-range="lastmonth"   onclick="setReportRange('lastmonth')">Last month</button>
+        <button class="chip" data-range="year"        onclick="setReportRange('year')">This year</button>
+      </div>
       <div class="input-row-3">
-        <div class="form-group"><label>From Date</label><input type="date" id="rpt-from"></div>
-        <div class="form-group"><label>To Date</label><input type="date" id="rpt-to" value="${today()}"></div>
+        <div class="form-group"><label>From Date <span class="text-dim">(blank = from the start)</span></label><input type="date" id="rpt-from" onchange="markCustomRange()"></div>
+        <div class="form-group"><label>To Date <span class="text-dim">(blank = no end)</span></label><input type="date" id="rpt-to" onchange="markCustomRange()"></div>
         <div class="form-group" style="align-self:end">
           <button class="btn btn-primary w-full" onclick="loadReport()">Generate Report</button>
         </div>
       </div>
       <div class="input-row">
-        <div class="form-group"><label>Filter by Client</label>
+        <div class="form-group"><label>Client</label>
           <select id="rpt-client"><option value="">All clients</option></select></div>
-        <div class="form-group"><label>Filter by Equipment</label>
+        <div class="form-group"><label>Equipment</label>
           <select id="rpt-equipment"><option value="">All equipment</option></select></div>
       </div>
     </div>
-    <div id="report-output" class="loading">Set filters and click Generate.</div>`;
+    <div id="report-output" class="loading">Loading…</div>`;
 
-  // Populate filter dropdowns
-  const clients = _allClients.length ? _allClients : await GET('/api/clients');
+  const clients = await GET('/api/clients');
   _allClients = clients;
-  const eq = _allEquipment.length ? _allEquipment : await GET('/api/equipment');
+  const eq = await GET('/api/equipment');
   _allEquipment = eq;
-
   const cs = document.getElementById('rpt-client');
-  clients.forEach(c => cs.innerHTML += `<option value="${c.id}">${c.name}</option>`);
+  cs.innerHTML += clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
   const es = document.getElementById('rpt-equipment');
-  eq.forEach(e => es.innerHTML += `<option value="${e.id}">${e.name} (${e.serial||'—'})</option>`);
+  es.innerHTML += eq.map(e => `<option value="${e.id}">${e.name} (${e.serial||'—'})</option>`).join('');
+  loadReport();   // show the all-time report straight away
+}
+
+function setReportRange(kind) {
+  const d = new Date(), y = d.getUTCFullYear(), m = d.getUTCMonth();
+  const iso = x => x.toISOString().slice(0,10);
+  let from = '', to = '';
+  if (kind === 'month')     { from = iso(new Date(Date.UTC(y, m, 1)));   to = iso(new Date(Date.UTC(y, m + 1, 0))); }
+  if (kind === 'lastmonth') { from = iso(new Date(Date.UTC(y, m - 1, 1))); to = iso(new Date(Date.UTC(y, m, 0))); }
+  if (kind === 'year')      { from = `${y}-01-01`; to = `${y}-12-31`; }
+  document.getElementById('rpt-from').value = from;
+  document.getElementById('rpt-to').value = to;
+  document.querySelectorAll('[data-range]').forEach(c => c.classList.toggle('active', c.dataset.range === kind));
+  loadReport();
+}
+function markCustomRange() { document.querySelectorAll('[data-range]').forEach(c => c.classList.remove('active')); }
+
+// Download a table as a CSV file that opens in Excel
+let _reportData = null;
+function downloadCSV(name, header, rows) {
+  const cell = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const csv = '﻿' + [header, ...rows].map(r => r.map(cell).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  const f = document.getElementById('rpt-from').value || 'start', t = document.getElementById('rpt-to').value || 'now';
+  a.download = `CreativeRentals_${name}_${f}_to_${t}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+const num = v => (+v || 0).toFixed(2);
+function exportReport(which) {
+  const d = _reportData; if (!d) return;
+  if (which === 'clients') downloadCSV('clients',
+    ['Client','Phone','Ghana Card','Rentals','Days','Revenue (GHS)','Paid (GHS)','Outstanding (GHS)','Last rental'],
+    d.by_client.map(c => [c.name, c.phone, c.ghana_card, c.rentals, c.days, num(c.revenue), num(c.paid), num(c.outstanding), c.last_rental || '']));
+  if (which === 'equipment') downloadCSV('equipment',
+    ['Equipment','Serial','Category','Times rented','Units rented','Unit-days','Revenue (GHS)','Last rented','Owned','In shop now'],
+    d.by_equipment.map(e => [e.name + (e.archived ? ' (removed)' : ''), e.serial, e.category, e.times_rented, e.units, e.unit_days, num(e.revenue), e.last_rented || '', e.total, e.available]));
+  if (which === 'rentals') downloadCSV('rentals',
+    ['Rental','Client','Phone','Equipment','From','To','Days','Status','Rental (GHS)','Deposit (GHS)','Paid (GHS)','Outstanding (GHS)'],
+    d.rentals.map(r => ['#R-' + String(r.id).padStart(4,'0'), r.client_name, r.phone, r.items, r.start_date, r.end_date, r.days, r.status,
+      num(r.subtotal), num(r.deposit_amt), num(r.total_paid), r.status === 'cancelled' ? '0.00' : num((+r.subtotal)+(+r.deposit_amt)-(+r.total_paid))]));
 }
 
 async function loadReport() {
@@ -1685,6 +1731,7 @@ async function loadReport() {
   const to   = document.getElementById('rpt-to').value;
   const cid  = document.getElementById('rpt-client').value;
   const eid  = document.getElementById('rpt-equipment').value;
+  if (from && to && to < from) { toast('The To date is before the From date', 'error'); return; }
   if (from) params.set('from', from);
   if (to)   params.set('to', to);
   if (cid)  params.set('client_id', cid);
@@ -1692,42 +1739,61 @@ async function loadReport() {
 
   document.getElementById('report-output').innerHTML = '<div class="loading">Generating…</div>';
   try {
-    const data = await GET('/api/reports/summary?' + params.toString());
-    const s = data.summary;
-    let rentRows = (data.rentals||[]).map(r =>
-      `<tr><td>#R-${String(r.id).padStart(4,'0')}</td><td>${r.client_name}</td>
-       <td>${periodText(r)}</td>
-       <td>${statusBadge(r.status)}</td><td>${ghc(r.subtotal)}</td><td>${ghc((+r.subtotal)+(+r.deposit_amt)-(+r.total_paid))}</td></tr>`
-    ).join('');
-    let eqRows = (data.equipment||[]).map(e =>
-      `<tr><td>${e.name}</td><td>${e.serial||'—'}</td><td>${e.times_rented}</td><td>${ghc(e.revenue)}</td></tr>`
-    ).join('');
+    const d = _reportData = await GET('/api/reports/summary?' + params.toString());
+    document.getElementById('report-output').className = '';
+    const s = d.summary;
+    const range = from || to ? `${from ? fmtDate(from) : 'the start'} – ${to ? fmtDate(to) : 'now'}` : 'All time';
+    const who = [cid ? document.getElementById('rpt-client').selectedOptions[0].textContent : 'All clients',
+                 eid ? document.getElementById('rpt-equipment').selectedOptions[0].textContent : 'All equipment'].join(' · ');
+    const csvBtn = w => `<button class="btn btn-secondary btn-sm" onclick="exportReport('${w}')">⬇ Excel (CSV)</button>`;
+
+    const clientRows = d.by_client.map(c => `<tr${c.rentals ? '' : ' style="opacity:.55"'}>
+        <td>${c.name}</td><td>${c.rentals}</td><td>${c.days}</td><td>${ghc(c.revenue)}</td><td>${ghc(c.paid)}</td>
+        <td>${+c.outstanding > 0 ? `<span class="text-red">${ghc(c.outstanding)}</span>` : ghc(c.outstanding)}</td>
+        <td>${c.last_rental ? fmtDate(c.last_rental) : '—'}</td></tr>`).join('');
+    const eqRows = d.by_equipment.map(e => `<tr${e.times_rented ? '' : ' style="opacity:.55"'}>
+        <td><div class="eq-name-cell">${eqThumb(e,'sm')}<span>${e.name}${e.archived ? ' <span class="text-dim">(removed)</span>' : ''}</span></div></td>
+        <td>${e.serial||'—'}</td><td>${e.category}</td><td>${e.times_rented}</td><td>${e.unit_days}</td><td>${ghc(e.revenue)}</td>
+        <td>${e.last_rented ? fmtDate(e.last_rented) : '—'}</td></tr>`).join('');
+    const rentRows = d.rentals.map(r => `<tr>
+        <td>#R-${String(r.id).padStart(4,'0')}</td><td>${r.client_name}</td><td>${r.items||'—'}</td>
+        <td>${periodText(r)}</td><td>${statusBadge(r.status)}</td><td>${ghc(r.subtotal)}</td>
+        <td>${r.status === 'cancelled' ? '—' : ghc((+r.subtotal)+(+r.deposit_amt)-(+r.total_paid))}</td></tr>`).join('');
+    const rentedClients = d.by_client.filter(c => c.rentals).length, rentedItems = d.by_equipment.filter(e => e.times_rented).length;
 
     document.getElementById('report-output').innerHTML = `
+      <p class="text-dim" style="margin-bottom:12px">Showing <strong style="color:var(--text)">${range}</strong> · ${who}</p>
       <div class="stat-grid">
-        <div class="stat-card"><div class="stat-label">Total Rentals</div><div class="stat-value">${s.total_rentals}</div></div>
+        <div class="stat-card"><div class="stat-label">Rentals</div><div class="stat-value">${s.total_rentals}</div><div class="stat-sub">${s.cancelled_rentals>0 ? s.cancelled_rentals+' cancelled not counted' : 'excl. cancelled'}</div></div>
         <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value text-accent">${s.active_rentals}</div></div>
         <div class="stat-card"><div class="stat-label">Returned</div><div class="stat-value text-green">${s.returned_rentals}</div></div>
         <div class="stat-card"><div class="stat-label">Overdue</div><div class="stat-value text-red">${s.overdue_rentals}</div></div>
         <div class="stat-card"><div class="stat-label">Booked (upcoming)</div><div class="stat-value" style="color:#c4b5fd">${s.booked_rentals||0}</div></div>
-        <div class="stat-card"><div class="stat-label">Gross Revenue</div><div class="stat-value">${ghc(s.gross_revenue)}</div></div>
-        <div class="stat-card"><div class="stat-label">Collected</div><div class="stat-value text-green">${ghc(s.collected)}</div></div>
-        <div class="stat-card"><div class="stat-label">Outstanding</div><div class="stat-value text-red">${ghc(s.outstanding)}</div></div>
+        <div class="stat-card"><div class="stat-label">Rental Revenue</div><div class="stat-value">${ghc(s.gross_revenue)}</div><div class="stat-sub">excl. deposits</div></div>
+        <div class="stat-card"><div class="stat-label">Collected</div><div class="stat-value text-green">${ghc(s.collected)}</div><div class="stat-sub">payments incl. deposits</div></div>
+        <div class="stat-card"><div class="stat-label">Outstanding</div><div class="stat-value text-red">${ghc(s.outstanding)}</div><div class="stat-sub">still to be paid</div></div>
       </div>
+
       <div class="card mt-3">
-        <div class="card-title mb-2">Rentals</div>
-        <div class="table-wrap">
-          <table><thead><tr><th>ID</th><th>Client</th><th>Dates</th><th>Status</th><th>Total</th><th>Outstanding</th></tr></thead>
-          <tbody>${rentRows||'<tr><td colspan="6" class="empty">No rentals in range</td></tr>'}</tbody></table>
-        </div>
+        <div class="card-header"><span class="card-title">👥 By Client — ${d.by_client.length} client${d.by_client.length===1?'':'s'} (${rentedClients} rented)</span>${csvBtn('clients')}</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Client</th><th>Rentals</th><th>Days</th><th>Revenue</th><th>Paid</th><th>Outstanding</th><th>Last rental</th></tr></thead>
+          <tbody>${clientRows || '<tr><td colspan="7" class="empty">No clients</td></tr>'}</tbody></table></div>
       </div>
-      ${eqRows ? `<div class="card mt-3">
-        <div class="card-title mb-2">Equipment Usage</div>
-        <div class="table-wrap">
-          <table><thead><tr><th>Name</th><th>Serial</th><th>Times Rented</th><th>Revenue</th></tr></thead>
-          <tbody>${eqRows}</tbody></table>
-        </div>
-      </div>` : ''}`;
+
+      <div class="card mt-3">
+        <div class="card-header"><span class="card-title">🎬 By Equipment — ${d.by_equipment.length} item${d.by_equipment.length===1?'':'s'} (${rentedItems} rented)</span>${csvBtn('equipment')}</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Equipment</th><th>Serial</th><th>Category</th><th>Times rented</th><th>Unit-days</th><th>Revenue</th><th>Last rented</th></tr></thead>
+          <tbody>${eqRows || '<tr><td colspan="7" class="empty">No equipment</td></tr>'}</tbody></table></div>
+      </div>
+
+      <div class="card mt-3">
+        <div class="card-header"><span class="card-title">📦 All Rentals — ${d.rentals.length}</span>${csvBtn('rentals')}</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>Client</th><th>Equipment</th><th>Dates</th><th>Status</th><th>Total</th><th>Outstanding</th></tr></thead>
+          <tbody>${rentRows || '<tr><td colspan="7" class="empty">No rentals in this range</td></tr>'}</tbody></table></div>
+      </div>`;
   } catch (err) {
     document.getElementById('report-output').innerHTML = `<div class="empty text-red">${err.message}</div>`;
   }
