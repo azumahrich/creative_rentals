@@ -13,9 +13,10 @@ const GROUPS = {
   payments:  ['payment_create', 'payment_delete'],
   clients:   ['client_create', 'client_update', 'client_delete'],
   equipment: ['equipment_create', 'equipment_update', 'equipment_photo', 'equipment_delete'],
+  expenses:  ['expense_create', 'expense_update', 'expense_delete'],
   users:     ['user_create', 'user_update', 'user_delete'],
-  deletes:   ['rental_delete', 'payment_delete', 'client_delete', 'equipment_delete', 'user_delete', 'data_clear', 'booking_cancel'],
-  system:    ['data_clear', 'data_import', 'emergency_reset'],
+  deletes:   ['rental_delete', 'payment_delete', 'client_delete', 'equipment_delete', 'user_delete', 'expense_delete', 'data_clear', 'booking_cancel'],
+  system:    ['data_clear', 'data_import', 'emergency_reset', 'settings_update'],
 };
 
 /**

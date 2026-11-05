@@ -332,6 +332,10 @@ tr:hover td{background:rgba(255,255,255,.025)}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
         Reports
       </div>
+      <div class="nav-item admin-nav-item" data-page="expenses" onclick="navigate('expenses')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 1 .7V2l-1 .7-3-2-3 2-3-2-3 2-3-2Z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+        Expenses
+      </div>
     </div>
     <div class="nav-section admin-only" id="admin-nav" style="display:none">
       <div class="nav-label">Admin</div>
@@ -510,6 +514,39 @@ tr:hover td{background:rgba(255,255,255,.025)}
   </div>
 </div>
 
+<!-- Expense Modal -->
+<div class="modal-overlay" id="modal-expense">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="exp-title">Record Expense</span>
+      <button class="modal-close" onclick="closeModal('modal-expense')">&times;</button>
+    </div>
+    <div class="input-row">
+      <div class="form-group"><label>Date spent *</label><input id="exp-date" type="date"></div>
+      <div class="form-group"><label>Amount (GH₵) *</label><input id="exp-amount" type="number" min="0" step="0.01" placeholder="0.00"></div>
+    </div>
+    <div class="form-group"><label>Category *</label><select id="exp-category"></select></div>
+    <div class="form-group"><label>What was it for? *</label><input id="exp-desc" placeholder="e.g. Fuel for delivery to Ejisu, Repair of Sony A7 IV shutter"></div>
+    <div class="input-row">
+      <div class="form-group"><label>Paid with</label>
+        <select id="exp-method">
+          <option value="cash">Cash</option><option value="momo">Mobile Money</option>
+          <option value="bank_transfer">Bank Transfer</option><option value="cheque">Cheque</option><option value="other">Other</option>
+        </select></div>
+      <div class="form-group"><label>Paid to</label><input id="exp-paidto" placeholder="Optional — shop, person, company"></div>
+    </div>
+    <div class="input-row">
+      <div class="form-group"><label>Receipt / MoMo ref.</label><input id="exp-ref" placeholder="Optional"></div>
+      <div class="form-group"><label>For equipment <span class="text-dim">(optional)</span></label><select id="exp-equipment"></select></div>
+    </div>
+    <p class="text-dim" style="font-size:.8rem;margin-top:-4px">Link repairs and parts to an item to see what each item really earns in Reports.</p>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-expense')">Cancel</button>
+      <button class="btn btn-primary" id="exp-save" onclick="saveExpense()">Save Expense</button>
+    </div>
+  </div>
+</div>
+
 <!-- Invoice Modal -->
 <div class="modal-overlay" id="modal-invoice">
   <div class="modal modal-lg">
@@ -613,7 +650,9 @@ async function api(method, path, body) {
 const GET    = (path)        => api('GET',    path);
 const POST   = (path, body)  => api('POST',   path, body);
 const PATCH  = (path, body)  => api('PATCH',  path, body);
+const PUT    = (path, body)  => api('PUT',    path, body);
 const DELETE = (path)        => api('DELETE', path);
+const escH = v => String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 // ═══════════════════════════════════════════════════════════════════
 //  Auth
@@ -684,11 +723,11 @@ async function bootApp() {
 // ═══════════════════════════════════════════════════════════════════
 const PAGES = { dashboard: renderDashboard, rentals: renderRentals, clients: renderClients,
                 equipment: renderEquipment, payments: renderPaymentsPage,
-                reports: renderReports, users: renderUsers, settings: renderSettings, activity: renderActivity };
+                reports: renderReports, expenses: renderExpenses, users: renderUsers, settings: renderSettings, activity: renderActivity };
 
 let _page = 'dashboard';
 
-const ADMIN_PAGES = ['payments','reports','users','settings','activity'];
+const ADMIN_PAGES = ['payments','reports','expenses','users','settings','activity'];
 function navigate(page) {
   if (!PAGES[page]) return;
   if (ADMIN_PAGES.includes(page) && !isAdmin()) page = 'dashboard';
@@ -697,7 +736,7 @@ function navigate(page) {
   closeSidebar();
   document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === page));
   const titles = { dashboard:'Dashboard', rentals:'Rentals', clients:'Clients',
-                   equipment:'Equipment', payments:'Payments', reports:'Reports', users:'Users', settings:'Settings', activity:'Activity Log' };
+                   equipment:'Equipment', payments:'Payments', reports:'Reports', expenses:'Expenses', users:'Users', settings:'Settings', activity:'Activity Log' };
   document.getElementById('topbar-title').textContent = titles[page] || page;
   const action = document.getElementById('topbar-action');
   action.style.display = 'none';
@@ -862,6 +901,7 @@ async function renderDashboard() {
         <div class="stat-card"><div class="stat-label">Total Clients</div><div class="stat-value">${stats.total_clients}</div></div>
         <div class="stat-card"><div class="stat-label">Equipment Items</div><div class="stat-value">${stats.total_equipment}</div></div>
         ${isAdmin() ? `<div class="stat-card"><div class="stat-label">This Month Revenue</div><div class="stat-value text-green">${ghc(stats.month_revenue)}</div><div class="stat-sub">collected</div></div>
+        <div class="stat-card"><div class="stat-label">This Month Expenses</div><div class="stat-value text-red">${ghc(stats.month_expenses)}</div><div class="stat-sub"><a href="#" onclick="navigate('expenses');return false" style="color:inherit">view expenses</a></div></div>
         <div class="stat-card"><div class="stat-label">Outstanding</div><div class="stat-value text-red">${ghc(stats.outstanding)}</div><div class="stat-sub">unpaid balance</div></div>` : ''}
       </div>
       <div class="card" style="margin-bottom:20px">
@@ -1260,6 +1300,7 @@ async function openRentalModal() {
   document.getElementById('rnt-eq-list').innerHTML = '';
   document.getElementById('rnt-total-row').textContent = '';
   document.getElementById('rnt-notes').value = '';
+  _discRules = await GET('/api/rentals/discount-rules').catch(() => _discRules);
   document.getElementById('rnt-start').value = today();
   document.getElementById('rnt-end').value   = today();
   document.getElementById('rnt-end').min     = today();
@@ -1370,6 +1411,16 @@ function removeEqRow(id) {
   calcRentalTotal();
 }
 
+// Loyalty discount (same rule as the server: below min → none, min to threshold → low %, above → high %)
+let _discRules = null;
+function discountFor(gross) {
+  const r = _discRules, g = Math.round(gross * 100) / 100;
+  if (!r || !r.enabled || g <= 0 || g < +(r.min_amount || 0)) return { gross: g, pct: 0, amount: 0, net: g };
+  const pct = g <= +r.threshold ? +r.low_pct : +r.high_pct;
+  const amount = Math.round(g * pct) / 100;
+  return { gross: g, pct, amount, net: Math.round((g - amount) * 100) / 100 };
+}
+
 function calcRentalTotal() {
   const start = document.getElementById('rnt-start').value;
   const endEl = document.getElementById('rnt-end');
@@ -1386,8 +1437,11 @@ function calcRentalTotal() {
     subtotal += price * qty * days;
     deposit  += dep * qty;
   });
-  document.getElementById('rnt-total-row').textContent =
-    `${days>1 ? days+' days' : 'Same day, 8:00 AM – 5:00 PM'} — Subtotal: ${ghc(subtotal)} + Deposit: ${ghc(deposit)} = ${ghc(subtotal+deposit)}`;
+  const d = discountFor(subtotal);
+  document.getElementById('rnt-total-row').innerHTML =
+    `${days>1 ? days+' days' : 'Same day, 8:00 AM – 5:00 PM'} — Rental: ${ghc(d.gross)}` +
+    (d.amount ? ` <span class="text-green">− ${d.pct}% discount ${ghc(d.amount)}</span> = ${ghc(d.net)}` : '') +
+    ` + Deposit: ${ghc(deposit)} = <span style="white-space:nowrap">${ghc(d.net+deposit)}</span>`;
 }
 
 async function saveRental() {
@@ -1549,6 +1603,8 @@ async function showInvoice(id) {
     const subtotal = parseFloat(r.subtotal||0);
     const deposit  = parseFloat(r.deposit_amt||0);
     const balance  = subtotal + deposit - paid;
+    const discAmt  = parseFloat(r.discount_amt||0);
+    const gross    = parseFloat(r.gross_amount||subtotal);
 
     document.getElementById('invoice-content').innerHTML = `
     <div class="invoice-wrap" id="printable-invoice">
@@ -1588,7 +1644,11 @@ async function showInvoice(id) {
         <thead><tr><th>Item</th><th>Serial</th><th>Qty</th><th>Rate</th><th>Subtotal</th></tr></thead>
         <tbody>${items}</tbody>
         <tfoot>
-          <tr><td colspan="4" style="text-align:right">Equipment Subtotal</td><td>${ghc(subtotal)}</td></tr>
+          ${discAmt > 0 ? `
+          <tr><td colspan="4" style="text-align:right">Equipment Subtotal</td><td>${ghc(gross)}</td></tr>
+          <tr><td colspan="4" style="text-align:right;color:green">Loyalty Discount (${+r.discount_pct}%)</td><td style="color:green">− ${ghc(discAmt)}</td></tr>
+          <tr><td colspan="4" style="text-align:right">Rental after discount</td><td>${ghc(subtotal)}</td></tr>`
+          : `<tr><td colspan="4" style="text-align:right">Equipment Subtotal</td><td>${ghc(subtotal)}</td></tr>`}
           <tr><td colspan="4" style="text-align:right">Deposit</td><td>${ghc(deposit)}</td></tr>
           <tr><td colspan="4" style="text-align:right">Amount Paid</td><td style="color:green">(${ghc(paid)})</td></tr>
           <tr><td colspan="4" style="text-align:right;color:#E8520A;font-weight:800">BALANCE DUE</td><td style="color:#E8520A;font-size:1.1rem">${ghc(balance)}</td></tr>
@@ -1646,7 +1706,9 @@ function shareWhatsApp() {
     `*Client:* ${r.client_name||'—'}\n` +
     `*Period:* ${periodText(r)}${(!r.end_date||r.start_date===r.end_date)?' (9 hours)':' ('+r.days+' days)'}\n\n` +
     `*Items:*\n${items}\n\n` +
-    `*Subtotal:* ${ghc(subtotal)}\n` +
+    (+r.discount_amt > 0
+      ? `*Subtotal:* ${ghc(r.gross_amount)}\n*Discount (${+r.discount_pct}%):* − ${ghc(r.discount_amt)}\n*Rental after discount:* ${ghc(subtotal)}\n`
+      : `*Subtotal:* ${ghc(subtotal)}\n`) +
     `*Deposit:* ${ghc(deposit)}\n` +
     `*Paid:* ${ghc(paid)}\n` +
     `*Balance Due:* ${ghc(balance)}\n\n` +
@@ -1736,12 +1798,15 @@ function exportReport(which) {
     ['Client','Phone','Ghana Card','Rentals','Days','Revenue (GHS)','Paid (GHS)','Outstanding (GHS)','Last rental'],
     d.by_client.map(c => [c.name, c.phone, c.ghana_card, c.rentals, c.days, num(c.revenue), num(c.paid), num(c.outstanding), c.last_rental || '']));
   if (which === 'equipment') downloadCSV('equipment',
-    ['Equipment','Serial','Category','Times rented','Units rented','Unit-days','Revenue (GHS)','Last rented','Owned','In shop now'],
-    d.by_equipment.map(e => [e.name + (e.archived ? ' (removed)' : ''), e.serial, e.category, e.times_rented, e.units, e.unit_days, num(e.revenue), e.last_rented || '', e.total, e.available]));
+    ['Equipment','Serial','Category','Times rented','Units rented','Unit-days','Revenue (GHS)','Expenses (GHS)','Net (GHS)','Last rented','Owned','In shop now'],
+    d.by_equipment.map(e => [e.name + (e.archived ? ' (removed)' : ''), e.serial, e.category, e.times_rented, e.units, e.unit_days, num(e.revenue), num(e.expenses), num(e.net), e.last_rented || '', e.total, e.available]));
+  if (which === 'expenses') downloadCSV('expenses',
+    ['Date','Category','Description','Amount (GHS)','Paid with','Paid to','Reference','Equipment','Recorded by'],
+    (d.expenses||[]).map(x => [x.spent_on, x.category, x.description, num(x.amount), x.method, x.paid_to, x.reference, x.equipment_name, x.created_by_name]));
   if (which === 'rentals') downloadCSV('rentals',
-    ['Rental','Client','Phone','Equipment','From','To','Days','Status','Rental (GHS)','Deposit (GHS)','Paid (GHS)','Outstanding (GHS)'],
+    ['Rental','Client','Phone','Equipment','From','To','Days','Status','Before discount (GHS)','Discount %','Discount (GHS)','Rental (GHS)','Deposit (GHS)','Paid (GHS)','Outstanding (GHS)'],
     d.rentals.map(r => ['#R-' + String(r.id).padStart(4,'0'), r.client_name, r.phone, r.items, r.start_date, r.end_date, r.days, r.status,
-      num(r.subtotal), num(r.deposit_amt), num(r.total_paid), r.status === 'cancelled' ? '0.00' : num((+r.subtotal)+(+r.deposit_amt)-(+r.total_paid))]));
+      num(r.gross_amount || r.subtotal), +r.discount_pct || 0, num(r.discount_amt), num(r.subtotal), num(r.deposit_amt), num(r.total_paid), r.status === 'cancelled' ? '0.00' : num((+r.subtotal)+(+r.deposit_amt)-(+r.total_paid))]));
 }
 
 async function loadReport() {
@@ -1773,7 +1838,14 @@ async function loadReport() {
     const eqRows = d.by_equipment.map(e => `<tr${e.times_rented ? '' : ' style="opacity:.55"'}>
         <td><div class="eq-name-cell">${eqThumb(e,'sm')}<span>${e.name}${e.archived ? ' <span class="text-dim">(removed)</span>' : ''}</span></div></td>
         <td>${e.serial||'—'}</td><td>${e.category}</td><td>${e.times_rented}</td><td>${e.unit_days}</td><td>${ghc(e.revenue)}</td>
+        <td>${+e.expenses ? `<span class="text-red">${ghc(e.expenses)}</span>` : '—'}</td>
+        <td>${+e.expenses ? `<strong class="${+e.net >= 0 ? 'text-green' : 'text-red'}">${ghc(e.net)}</strong>` : ghc(e.net)}</td>
         <td>${e.last_rented ? fmtDate(e.last_rented) : '—'}</td></tr>`).join('');
+    const expRows = (d.expenses||[]).map(x => `<tr>
+        <td>${fmtDate(x.spent_on)}</td><td>${escH(x.category)}</td><td>${escH(x.description)}${x.equipment_name ? `<br><span class="text-dim">🎬 ${escH(x.equipment_name)}</span>` : ''}</td>
+        <td>${escH(x.paid_to||'—')}</td><td class="text-red">${ghc(x.amount)}</td></tr>`).join('');
+    const catRows = (d.by_category||[]).map(c => `<tr><td>${escH(c.category)}</td><td>${c.count}</td><td class="text-red">${ghc(c.amount)}</td>
+        <td>${+s.expenses ? Math.round(c.amount / s.expenses * 100) + '%' : '—'}</td></tr>`).join('');
     const rentRows = d.rentals.map(r => `<tr>
         <td>#R-${String(r.id).padStart(4,'0')}</td><td>${r.client_name}</td><td>${r.items||'—'}</td>
         <td>${periodText(r)}</td><td>${statusBadge(r.status)}</td><td>${ghc(r.subtotal)}</td>
@@ -1788,7 +1860,10 @@ async function loadReport() {
         <div class="stat-card"><div class="stat-label">Returned</div><div class="stat-value text-green">${s.returned_rentals}</div></div>
         <div class="stat-card"><div class="stat-label">Overdue</div><div class="stat-value text-red">${s.overdue_rentals}</div></div>
         <div class="stat-card"><div class="stat-label">Booked (upcoming)</div><div class="stat-value" style="color:#c4b5fd">${s.booked_rentals||0}</div></div>
-        <div class="stat-card"><div class="stat-label">Rental Revenue</div><div class="stat-value">${ghc(s.gross_revenue)}</div><div class="stat-sub">excl. deposits</div></div>
+        <div class="stat-card"><div class="stat-label">Rental Revenue</div><div class="stat-value">${ghc(s.gross_revenue)}</div><div class="stat-sub">after discounts, excl. deposits</div></div>
+        <div class="stat-card"><div class="stat-label">Discounts Given</div><div class="stat-value" style="color:#fbbf24">${ghc(s.discounts)}</div><div class="stat-sub">before discount ${ghc(s.before_discount)}</div></div>
+        ${s.expenses_hidden ? '' : `<div class="stat-card"><div class="stat-label">Expenses</div><div class="stat-value text-red">${ghc(s.expenses)}</div><div class="stat-sub">${d.expenses.length} recorded</div></div>
+        <div class="stat-card" style="border-color:${+s.net_profit >= 0 ? '#166534' : '#7f1d1d'}"><div class="stat-label">Net Profit</div><div class="stat-value ${+s.net_profit >= 0 ? 'text-green' : 'text-red'}">${ghc(s.net_profit)}</div><div class="stat-sub">revenue − expenses</div></div>`}
         <div class="stat-card"><div class="stat-label">Collected</div><div class="stat-value text-green">${ghc(s.collected)}</div><div class="stat-sub">payments incl. deposits</div></div>
         <div class="stat-card"><div class="stat-label">Outstanding</div><div class="stat-value text-red">${ghc(s.outstanding)}</div><div class="stat-sub">still to be paid</div></div>
       </div>
@@ -1803,9 +1878,22 @@ async function loadReport() {
       <div class="card mt-3">
         <div class="card-header"><span class="card-title">🎬 By Equipment — ${d.by_equipment.length} item${d.by_equipment.length===1?'':'s'} (${rentedItems} rented)</span>${csvBtn('equipment')}</div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Equipment</th><th>Serial</th><th>Category</th><th>Times rented</th><th>Unit-days</th><th>Revenue</th><th>Last rented</th></tr></thead>
-          <tbody>${eqRows || '<tr><td colspan="7" class="empty">No equipment</td></tr>'}</tbody></table></div>
+          <thead><tr><th>Equipment</th><th>Serial</th><th>Category</th><th>Times rented</th><th>Unit-days</th><th>Revenue</th><th>Expenses</th><th>Net</th><th>Last rented</th></tr></thead>
+          <tbody>${eqRows || '<tr><td colspan="9" class="empty">No equipment</td></tr>'}</tbody></table></div>
       </div>
+
+      ${s.expenses_hidden ? `<p class="text-dim mt-3" style="font-size:.85rem">Expenses aren't linked to clients, so they're not shown in a single-client report. Choose <strong>All clients</strong> to see expenses and net profit.</p>` : `
+      <div class="card mt-3">
+        <div class="card-header"><span class="card-title">🧾 Expenses — ${ghc(s.expenses)}</span>${csvBtn('expenses')}</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px">
+          <div class="table-wrap"><table>
+            <thead><tr><th>Category</th><th>Count</th><th>Amount</th><th>Share</th></tr></thead>
+            <tbody>${catRows || '<tr><td colspan="4" class="empty">No expenses in this range</td></tr>'}</tbody></table></div>
+          <div class="table-wrap" style="max-height:420px;overflow:auto"><table>
+            <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Paid to</th><th>Amount</th></tr></thead>
+            <tbody>${expRows || '<tr><td colspan="5" class="empty">No expenses in this range</td></tr>'}</tbody></table></div>
+        </div>
+      </div>`}
 
       <div class="card mt-3">
         <div class="card-header"><span class="card-title">📦 All Rentals — ${d.rentals.length}</span>${csvBtn('rentals')}</div>
@@ -1816,6 +1904,155 @@ async function loadReport() {
   } catch (err) {
     document.getElementById('report-output').innerHTML = `<div class="empty text-red">${err.message}</div>`;
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Expenses  (admins)
+// ═══════════════════════════════════════════════════════════════════
+let _exp = { items: [], categories: [], range: 'month', editId: null };
+const EXP_METHOD = { cash:'Cash', momo:'Mobile Money', bank_transfer:'Bank Transfer', cheque:'Cheque', other:'Other' };
+
+function expRange(kind) {
+  const d = new Date(), y = d.getUTCFullYear(), m = d.getUTCMonth(), iso = x => x.toISOString().slice(0,10);
+  if (kind === 'month')     return [iso(new Date(Date.UTC(y, m, 1))), iso(new Date(Date.UTC(y, m + 1, 0)))];
+  if (kind === 'lastmonth') return [iso(new Date(Date.UTC(y, m - 1, 1))), iso(new Date(Date.UTC(y, m, 0)))];
+  if (kind === 'year')      return [`${y}-01-01`, `${y}-12-31`];
+  return ['', ''];
+}
+
+async function renderExpenses() {
+  const [from, to] = expRange(_exp.range);
+  document.getElementById('page-content').innerHTML = `
+    <div class="flex" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+      <h1 class="page-title" style="margin:0">Expenses</h1>
+      <button class="btn btn-primary" onclick="openExpenseModal()">＋ Record Expense</button>
+    </div>
+    <p class="text-dim" style="margin:-6px 0 16px;font-size:.88rem">Every cost of running the business — fuel, repairs, rent, electricity, airtime, wages. Expenses are taken off rental revenue in <a href="#" onclick="navigate('reports');return false" style="color:var(--accent)">Reports</a> to show your net profit.</p>
+    <div class="card" style="margin-bottom:20px">
+      <div class="chips">
+        ${[['month','This month'],['lastmonth','Last month'],['year','This year'],['all','All time']].map(([k,l]) =>
+          `<button class="chip${_exp.range===k?' active':''}" data-xrange="${k}" onclick="_exp.range='${k}';renderExpenses()">${l}</button>`).join('')}
+      </div>
+      <div class="input-row-3">
+        <div class="form-group"><label>From</label><input type="date" id="exp-from" value="${from}"></div>
+        <div class="form-group"><label>To</label><input type="date" id="exp-to" value="${to}"></div>
+        <div class="form-group"><label>Category</label><select id="exp-cat"><option value="">All categories</option></select></div>
+      </div>
+      <div class="input-row">
+        <div class="form-group"><label>Search</label><input id="exp-q" placeholder="Description, paid to, receipt no., equipment…"></div>
+        <div class="form-group" style="align-self:end"><div class="flex gap-2">
+          <button class="btn btn-primary" onclick="loadExpenses()">Show</button>
+          <button class="btn btn-secondary" onclick="exportExpenses()">⬇ Excel (CSV)</button></div></div>
+      </div>
+    </div>
+    <div id="exp-out"><div class="loading">Loading…</div></div>`;
+  ['exp-from','exp-to','exp-cat'].forEach(id => document.getElementById(id).addEventListener('change', () => {
+    if (id !== 'exp-cat') document.querySelectorAll('[data-xrange]').forEach(c => c.classList.remove('active'));
+    loadExpenses(); }));
+  document.getElementById('exp-q').addEventListener('keydown', e => { if (e.key === 'Enter') loadExpenses(); });
+  loadExpenses(true);
+}
+
+async function loadExpenses(first) {
+  const p = new URLSearchParams();
+  const v = id => document.getElementById(id).value.trim();
+  if (v('exp-from')) p.set('from', v('exp-from'));
+  if (v('exp-to'))   p.set('to', v('exp-to'));
+  if (v('exp-cat'))  p.set('category', v('exp-cat'));
+  if (v('exp-q'))    p.set('q', v('exp-q'));
+  try {
+    const d = await GET('/api/expenses?' + p);
+    _exp.items = d.items; _exp.categories = d.categories;
+    if (first) document.getElementById('exp-cat').innerHTML += d.categories.map(c => `<option>${escH(c)}</option>`).join('');
+    const total = d.items.reduce((t, x) => t + +x.amount, 0);
+    const byCat = {};
+    d.items.forEach(x => byCat[x.category] = (byCat[x.category] || 0) + +x.amount);
+    const top = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+    const rows = d.items.map(x => `<tr>
+      <td>${fmtDate(x.spent_on)}</td>
+      <td>${escH(x.category)}</td>
+      <td>${escH(x.description)}${x.equipment_name ? `<br><span class="text-dim">🎬 ${escH(x.equipment_name)}</span>` : ''}</td>
+      <td>${escH(x.paid_to || '—')}${x.reference ? `<br><span class="text-dim">Ref ${escH(x.reference)}</span>` : ''}</td>
+      <td>${EXP_METHOD[x.method] || x.method}</td>
+      <td class="text-red" style="font-weight:700">${ghc(x.amount)}</td>
+      <td class="text-dim">${escH(x.created_by_name || '—')}</td>
+      <td><div class="flex gap-2">
+        <button class="btn-icon btn-sm" title="Edit" onclick="openExpenseModal(${x.id})">✏️</button>
+        <button class="btn-icon btn-sm" title="Delete" onclick="deleteExpense(${x.id})">🗑️</button></div></td>
+    </tr>`).join('');
+    document.getElementById('exp-out').innerHTML = `
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Total spent</div><div class="stat-value text-red">${ghc(total)}</div><div class="stat-sub">${d.items.length} expense${d.items.length===1?'':'s'}</div></div>
+        ${top.slice(0, 3).map(([c, a]) => `<div class="stat-card" style="cursor:pointer" onclick="document.getElementById('exp-cat').value='${escH(c).replace(/'/g,"\\'")}';loadExpenses()">
+          <div class="stat-label">${escH(c)}</div><div class="stat-value">${ghc(a)}</div><div class="stat-sub">${Math.round(a / total * 100)}% of spending</div></div>`).join('')}
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Paid to</th><th>Paid with</th><th>Amount</th><th>Recorded by</th><th></th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="8" class="empty">No expenses for these dates. Tap ＋ Record Expense to add one.</td></tr>'}</tbody>
+      </table></div>`;
+  } catch (err) { document.getElementById('exp-out').innerHTML = `<div class="empty text-red">${err.message}</div>`; }
+}
+
+async function openExpenseModal(id) {
+  const x = id ? _exp.items.find(e => e.id === id) : null;
+  _exp.editId = x ? x.id : null;
+  if (!_exp.categories.length) { const d = await GET('/api/expenses?from=2999-01-01'); _exp.categories = d.categories; }
+  const eq = _allEquipment.length ? _allEquipment : (_allEquipment = await GET('/api/equipment'));
+  document.getElementById('exp-title').textContent = x ? 'Edit Expense' : 'Record Expense';
+  document.getElementById('exp-date').value = x ? x.spent_on : today();
+  document.getElementById('exp-amount').value = x ? (+x.amount).toFixed(2) : '';
+  const cats = [..._exp.categories]; if (x && !cats.includes(x.category)) cats.push(x.category);
+  document.getElementById('exp-category').innerHTML = '<option value="">— choose —</option>' + cats.map(c => `<option${x && x.category===c ? ' selected' : ''}>${escH(c)}</option>`).join('');
+  document.getElementById('exp-desc').value = x ? x.description : '';
+  document.getElementById('exp-method').value = x ? x.method : 'cash';
+  document.getElementById('exp-paidto').value = x ? (x.paid_to || '') : '';
+  document.getElementById('exp-ref').value = x ? (x.reference || '') : '';
+  document.getElementById('exp-equipment').innerHTML = '<option value="">— not for a specific item —</option>' +
+    eq.map(e => `<option value="${e.id}"${x && x.equipment_id === e.id ? ' selected' : ''}>${escH(e.name)}${e.serial ? ' (' + escH(e.serial) + ')' : ''}</option>`).join('');
+  openModal('modal-expense');
+  setTimeout(() => document.getElementById(x ? 'exp-desc' : 'exp-amount').focus(), 50);
+}
+
+async function saveExpense() {
+  const body = {
+    spent_on: document.getElementById('exp-date').value,
+    amount: document.getElementById('exp-amount').value,
+    category: document.getElementById('exp-category').value,
+    description: document.getElementById('exp-desc').value,
+    method: document.getElementById('exp-method').value,
+    paid_to: document.getElementById('exp-paidto').value,
+    reference: document.getElementById('exp-ref').value,
+    equipment_id: document.getElementById('exp-equipment').value || null };
+  if (!body.spent_on) return toast('Choose the date', 'error');
+  if (!(+body.amount > 0)) return toast('Enter the amount spent', 'error');
+  if (!body.category) return toast('Choose a category', 'error');
+  if (!body.description.trim()) return toast('Say what the money was spent on', 'error');
+  const btn = document.getElementById('exp-save'); btn.disabled = true;
+  try {
+    if (_exp.editId) await PATCH('/api/expenses/' + _exp.editId, body); else await POST('/api/expenses', body);
+    closeModal('modal-expense');
+    toast(_exp.editId ? 'Expense updated' : `Expense of ${ghc(body.amount)} recorded`);
+    if (_page === 'expenses') loadExpenses();
+  } catch (err) { toast(err.message, 'error'); }
+  btn.disabled = false;
+}
+
+async function deleteExpense(id) {
+  const x = _exp.items.find(e => e.id === id);
+  if (!confirm(`Delete this expense?\n\n${x ? ghc(x.amount) + ' — ' + x.description : ''}`)) return;
+  try { await DELETE('/api/expenses/' + id); toast('Expense deleted'); loadExpenses(); }
+  catch (err) { toast(err.message, 'error'); }
+}
+
+function exportExpenses() {
+  const val = id => document.getElementById(id).value;
+  const cell = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const rows = [['Date','Category','Description','Amount (GHS)','Paid with','Paid to','Reference','Equipment','Recorded by'],
+    ..._exp.items.map(x => [x.spent_on, x.category, x.description, (+x.amount).toFixed(2), EXP_METHOD[x.method] || x.method, x.paid_to, x.reference, x.equipment_name, x.created_by_name])];
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + rows.map(r => r.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+  a.download = `CreativeRentals_expenses_${val('exp-from') || 'start'}_to_${val('exp-to') || 'now'}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1834,8 +2071,8 @@ const ACT_ICON = { login:'🔓', login_failed:'⛔', password_change:'🔑', eme
   rental_create:'📦', booking_create:'📅', rental_pickup:'🤝', rental_return:'✅', booking_cancel:'✖️', rental_delete:'🗑️',
   payment_create:'💰', payment_delete:'🗑️', client_create:'👤', client_update:'✏️', client_delete:'🗑️',
   equipment_create:'🎬', equipment_update:'✏️', equipment_photo:'📷', equipment_delete:'🗑️',
-  user_create:'🧑‍💼', user_update:'🛠️', user_delete:'🗑️', data_clear:'⚠️', data_import:'⬆️' };
-const ACT_WARN = ['login_failed','rental_delete','payment_delete','client_delete','equipment_delete','user_delete','data_clear','emergency_reset'];
+  expense_create:'🧾', expense_update:'✏️', expense_delete:'🗑️', settings_update:'⚙️', user_create:'🧑‍💼', user_update:'🛠️', user_delete:'🗑️', data_clear:'⚠️', data_import:'⬆️' };
+const ACT_WARN = ['login_failed','rental_delete','payment_delete','expense_delete','client_delete','equipment_delete','user_delete','data_clear','emergency_reset'];
 let _act = { items: [], more: false, filters: {} };
 
 async function renderActivity() {
@@ -1862,6 +2099,7 @@ async function renderActivity() {
             <option value="payments">Payments</option>
             <option value="clients">Clients</option>
             <option value="equipment">Equipment</option>
+            <option value="expenses">Expenses</option>
             <option value="users">User accounts</option>
             <option value="signins">Sign-ins & passwords</option>
             <option value="failed">⛔ Failed sign-ins only</option>
@@ -2071,8 +2309,10 @@ const CLEAR_INFO = {
   rentals:   { word:'RENTALS',   title:'Clear all rentals',
     desc: c => `Removes all <strong>${c.rentals}</strong> rentals and their <strong>${c.payments}</strong> payments. Clients and equipment are kept, and all equipment becomes available again.` },
   all:       { word:'EVERYTHING', title:'Clear everything',
-    desc: c => `Removes all <strong>${c.equipment}</strong> equipment items, <strong>${c.clients}</strong> clients, <strong>${c.rentals}</strong> rentals and <strong>${c.payments}</strong> payments. User accounts are kept so you can still log in.` },
+    desc: c => `Removes all <strong>${c.equipment}</strong> equipment items, <strong>${c.clients}</strong> clients, <strong>${c.rentals}</strong> rentals <strong>${c.payments}</strong> payments and <strong>${c.expenses}</strong> expenses. User accounts are kept so you can still log in.` },
   import:    { word:'IMPORT',    title:'Import offline backup', desc: () => '' },
+  expenses:  { word:'EXPENSES',  title:'Clear all expenses',
+    desc: c => `Removes all <strong>${c.expenses}</strong> recorded expenses. Rentals, payments, clients and equipment are kept.` },
   payments:  { word:'PAYMENTS',  title:'Clear all payments',
     desc: c => `Removes all <strong>${c.payments}</strong> recorded payments. Rentals are kept, but every rental will show as unpaid.` }
 };
@@ -2082,6 +2322,7 @@ async function renderSettings() {
   try {
     _counts = await GET('/api/admin/counts');
     const c = _counts;
+    const dr = await GET('/api/admin/discount-rules');
     document.getElementById('page-content').innerHTML = `
       <h1 class="page-title">Settings</h1>
       <div class="stat-grid">
@@ -2089,6 +2330,25 @@ async function renderSettings() {
         <div class="stat-card"><div class="stat-label">Clients</div><div class="stat-value">${c.clients}</div></div>
         <div class="stat-card"><div class="stat-label">Rentals</div><div class="stat-value">${c.rentals}</div></div>
         <div class="stat-card"><div class="stat-label">Payments</div><div class="stat-value">${c.payments}</div></div>
+        <div class="stat-card"><div class="stat-label">Expenses</div><div class="stat-value">${c.expenses}</div></div>
+      </div>
+      <div class="card" style="max-width:760px;margin-bottom:20px">
+        <div class="card-header"><span class="card-title">🏷️ Loyalty discount</span></div>
+        <p class="text-dim" style="font-size:.88rem;margin-bottom:14px;line-height:1.5">
+          Taken off the rental charge of every <strong>new</strong> rental automatically (the deposit is not discounted).
+          Rentals already made keep their prices.</p>
+        <label style="display:flex;gap:8px;align-items:center;margin-bottom:12px;cursor:pointer">
+          <input type="checkbox" id="dsc-on" ${dr.enabled ? 'checked' : ''} style="width:auto"> Give the discount</label>
+        <div class="input-row">
+          <div class="form-group"><label>Rental charge from (GH₵)</label><input id="dsc-min" type="number" min="0" step="1" value="${dr.min_amount || 0}"></div>
+          <div class="form-group"><label>…up to (GH₵)</label><input id="dsc-limit" type="number" min="1" step="1" value="${dr.threshold}"></div>
+        </div>
+        <div class="input-row">
+          <div class="form-group"><label>…gets discount (%)</label><input id="dsc-low" type="number" min="0" max="100" step="0.5" value="${dr.low_pct}"></div>
+          <div class="form-group"><label>Above the upper amount gets (%)</label><input id="dsc-high" type="number" min="0" max="100" step="0.5" value="${dr.high_pct}"></div>
+        </div>
+        <p class="text-dim" style="font-size:.82rem;margin:-4px 0 12px">Rentals below the starting amount get no discount.</p>
+        <button class="btn btn-primary" onclick="saveDiscountRules()">Save discount</button>
       </div>
       <div class="card" style="max-width:760px;margin-bottom:20px">
         <div class="card-header"><span class="card-title">⬆ Import from the offline app</span></div>
@@ -2108,13 +2368,26 @@ async function renderSettings() {
           <button class="btn btn-danger" style="justify-content:center" onclick="openClear('clients')">👥 Clear all clients</button>
           <button class="btn btn-danger" style="justify-content:center" onclick="openClear('rentals')">📦 Clear all rentals</button>
           <button class="btn btn-danger" style="justify-content:center" onclick="openClear('payments')">💳 Clear all payments</button>
+          <button class="btn btn-danger" style="justify-content:center" onclick="openClear('expenses')">🧾 Clear all expenses</button>
         </div>
         <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
-          <button class="btn btn-danger" onclick="openClear('all')">🗑 Clear everything (equipment, clients, rentals &amp; payments)</button>
+          <button class="btn btn-danger" onclick="openClear('all')">🗑 Clear everything (equipment, clients, rentals, payments &amp; expenses)</button>
         </div>
         ${c.rentals_out ? `<p class="text-dim" style="font-size:.8rem;margin-top:12px">Note: ${c.rentals_out} rental(s) are still out — equipment can't be cleared until they're marked Returned.</p>` : ''}
       </div>`;
   } catch (err) { document.getElementById('page-content').innerHTML = `<div class="empty text-red">${err.message}</div>`; }
+}
+
+async function saveDiscountRules() {
+  try {
+    _discRules = await PUT('/api/admin/discount-rules', {
+      enabled: document.getElementById('dsc-on').checked,
+      min_amount: document.getElementById('dsc-min').value,
+      threshold: document.getElementById('dsc-limit').value,
+      low_pct: document.getElementById('dsc-low').value,
+      high_pct: document.getElementById('dsc-high').value });
+    toast(_discRules.enabled ? `Saved: ${_discRules.low_pct}% from ${ghc(_discRules.min_amount)} to ${ghc(_discRules.threshold)}, ${_discRules.high_pct}% above` : 'Discount turned off for new rentals');
+  } catch (err) { toast(err.message, 'error'); }
 }
 
 // ── Import offline backup ──

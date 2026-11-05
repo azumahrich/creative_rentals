@@ -4,18 +4,19 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { protectClient } = require('../middleware/privacy');
 const { availabilityFor, TODAY } = require('./availability');
 const { note, money } = require('../middleware/activity');
+const { getRules, discountFor } = require('../middleware/pricing');
 
 // One-line description of a rental for the activity log
 async function describe(q, rentalId) {
   const { rows: [r] } = await q.query(
-    `SELECT r.id, r.client_id, r.start_date, r.end_date, r.days, r.status, r.subtotal, r.deposit_amt, r.total_paid, c.name AS client,
+    `SELECT r.id, r.client_id, r.start_date, r.end_date, r.days, r.status, r.subtotal, r.deposit_amt, r.total_paid, r.discount_pct, r.discount_amt, c.name AS client,
             (SELECT string_agg(CASE WHEN re.qty > 1 THEN re.qty || ' × ' || e.name ELSE e.name END, ', ')
                FROM rental_equipment re JOIN equipment e ON e.id = re.equipment_id WHERE re.rental_id = r.id) AS items
      FROM rentals r JOIN clients c ON c.id = r.client_id WHERE r.id=$1`, [rentalId]);
   if (!r) return { text: '#R-' + String(rentalId).padStart(4, '0'), client_id: null };
   const dates = r.start_date === r.end_date ? r.start_date : `${r.start_date} → ${r.end_date}`;
   return { r, client_id: r.client_id,
-    text: `#R-${String(r.id).padStart(4,'0')} for ${r.client} — ${r.items || 'no items'}, ${dates}, ${money(r.subtotal)} + deposit ${money(r.deposit_amt)}` };
+    text: `#R-${String(r.id).padStart(4,'0')} for ${r.client} — ${r.items || 'no items'}, ${dates}, ${money(r.subtotal)}${+r.discount_amt ? ` (after ${+r.discount_pct}% discount of ${money(r.discount_amt)})` : ''} + deposit ${money(r.deposit_amt)}` };
 }
 
 router.use(requireAuth);
@@ -88,6 +89,11 @@ async function putBackStock(c, rentalId) {
      FROM (SELECT equipment_id, SUM(qty)::int AS qty FROM rental_equipment WHERE rental_id=$1 GROUP BY equipment_id) x
      WHERE e.id = x.equipment_id`, [rentalId]);
 }
+
+// GET /api/rentals/discount-rules — so the New Rental screen can show the discount
+router.get('/discount-rules', async (req, res) => {
+  try { res.json(await getRules(db)); } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 // GET /api/rentals/availability?from=YYYY-MM-DD&to=YYYY-MM-DD
 // How many of each item are free for those dates (used by the New Rental screen)
@@ -188,16 +194,20 @@ router.post('/', async (req, res) => {
       }
     }
 
-    let subtotal = 0, deposit = 0;
+    let gross = 0, deposit = 0;
     for (const item of equipment) {
-      subtotal += (item.unit_price  || 0) * (item.qty || 1) * (days || 1);
-      deposit  += (item.unit_deposit|| 0) * (item.qty || 1);
+      gross   += (item.unit_price  || 0) * (item.qty || 1) * (days || 1);
+      deposit += (item.unit_deposit|| 0) * (item.qty || 1);
     }
+    // Loyalty discount on the rental charge (not the deposit)
+    const disc = discountFor(gross, await getRules(pgClient));
 
     const { rows: [rental] } = await pgClient.query(
-      `INSERT INTO rentals (client_id, start_date, end_date, days, status, subtotal, deposit_amt, pickup_time, return_time, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [client_id, start_date, end_date, days, status, subtotal, deposit, RENTAL_START, RENTAL_END, notes||null]
+      `INSERT INTO rentals (client_id, start_date, end_date, days, status, subtotal, gross_amount, discount_pct, discount_amt,
+                            deposit_amt, pickup_time, return_time, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      [client_id, start_date, end_date, days, status, disc.net, disc.gross, disc.pct, disc.amount,
+       deposit, RENTAL_START, RENTAL_END, notes||null]
     );
     for (const item of equipment) {
       await pgClient.query(

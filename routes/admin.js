@@ -7,7 +7,30 @@ const { note } = require('../middleware/activity');
 // Clearing data is restricted to the Super Admin
 router.use(requireAuth, requireSuperAdmin);
 
-const WORDS = { equipment: 'EQUIPMENT', clients: 'CLIENTS', rentals: 'RENTALS', payments: 'PAYMENTS', all: 'EVERYTHING' };
+const { getRules } = require('../middleware/pricing');
+
+// GET/PUT /api/admin/discount-rules — loyalty discount settings (Super Admin)
+router.get('/discount-rules', async (req, res) => res.json(await getRules(db)));
+router.put('/discount-rules', async (req, res) => {
+  const b = req.body || {};
+  const r = { enabled: !!b.enabled, min_amount: +b.min_amount || 0, threshold: +b.threshold, low_pct: +b.low_pct, high_pct: +b.high_pct };
+  if (!(r.threshold > 0)) return res.status(400).json({ error: 'The amount must be more than 0' });
+  if (r.min_amount < 0 || r.min_amount > r.threshold)
+    return res.status(400).json({ error: 'The starting amount must be less than the upper amount' });
+  for (const k of ['low_pct', 'high_pct'])
+    if (!(r[k] >= 0 && r[k] <= 100)) return res.status(400).json({ error: 'Discounts must be between 0 and 100%' });
+  try {
+    const before = await getRules(db);
+    await db.query(`INSERT INTO app_meta (key, value) VALUES ('discount_rules', $1)
+                    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [JSON.stringify(r)]);
+    const txt = x => x.enabled ? `${x.low_pct}% from GH₵ ${x.min_amount || 0} to GH₵ ${x.threshold}, ${x.high_pct}% above` : 'off';
+    note(res, { action: 'settings_update', entity: 'settings', summary: `Changed loyalty discount: ${txt(before)} → ${txt(r)} (applies to new rentals)`,
+      changes: [{ field: 'Discount', from: txt(before), to: txt(r) }] });
+    res.json(r);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+const WORDS = { equipment: 'EQUIPMENT', clients: 'CLIENTS', rentals: 'RENTALS', payments: 'PAYMENTS', expenses: 'EXPENSES', all: 'EVERYTHING' };
 
 // GET /api/admin/counts — numbers shown in the clear-data dialogs
 router.get('/counts', async (req, res) => {
@@ -18,6 +41,7 @@ router.get('/counts', async (req, res) => {
         (SELECT COUNT(*) FROM clients)::int  AS clients,
         (SELECT COUNT(*) FROM rentals)::int  AS rentals,
         (SELECT COUNT(*) FROM payments)::int AS payments,
+        (SELECT COUNT(*) FROM expenses)::int AS expenses,
         (SELECT COUNT(*) FROM rentals WHERE status IN ('active','overdue','booked'))::int AS rentals_out`);
     res.json(c);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -56,12 +80,17 @@ router.post('/clear', async (req, res) => {
       await client.query('DELETE FROM equipment WHERE archived');       // removed items no longer needed for history
       result = `${rr.rowCount} rental(s) and their payments cleared`;
 
+    } else if (target === 'expenses') {
+      const x = await client.query('DELETE FROM expenses');
+      result = `${x.rowCount} expense(s) cleared`;
+
     } else if (target === 'all') {
+      const xr = await client.query('DELETE FROM expenses');
       const rr = await client.query('DELETE FROM rentals');
       const cr = await client.query('DELETE FROM clients');
       const er = await client.query('DELETE FROM equipment WHERE NOT archived');
       await client.query('DELETE FROM equipment');
-      result = `Everything cleared: ${er.rowCount} equipment, ${cr.rowCount} client(s), ${rr.rowCount} rental(s) and their payments. User accounts were kept.`;
+      result = `Everything cleared: ${er.rowCount} equipment, ${cr.rowCount} client(s), ${rr.rowCount} rental(s) and their payments, ${xr.rowCount} expense(s). User accounts were kept.`;
 
     } else if (target === 'clients') {
       // Every rental belongs to a client, so rentals (and their payments/items) go too

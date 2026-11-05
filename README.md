@@ -134,3 +134,13 @@ routes/              API: auth, users, clients, equipment, rentals, payments, re
 public/index.html    The app screens
 public/logo.png      Creative Rentals logo
 ```
+
+## Expenses & net profit
+Admins record business costs on the **Expenses** page (date, category, amount, paid with/to, receipt ref, and
+optionally the equipment item a repair was for). Reports deduct expenses from rental revenue to show **Net Profit**,
+with a breakdown by category and an Expenses/Net column per equipment item. Staff can't see expenses.
+
+## Loyalty discount
+Applied automatically to every new rental's charge (never the deposit): under GH₵ 1,000 → no discount,
+GH₵ 1,000 – 1,500 → 5% off, above GH₵ 1,500 → 8% off. The Super Admin can change or switch it off in Settings. Rentals made before
+this update keep their original prices. Invoices and WhatsApp messages show the discount line.

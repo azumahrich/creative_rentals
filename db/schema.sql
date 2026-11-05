@@ -213,3 +213,34 @@ DELETE FROM activity_log WHERE at < NOW() - INTERVAL '2 years';
 -- When each person last signed in / was last active
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at  TIMESTAMPTZ;
+
+-- ─── Discounts ───────────────────────────────────────────────────────────────
+-- subtotal = what the client pays for the rental AFTER discount (so balances and reports
+-- keep working). gross_amount = before discount. Older rentals had no discount.
+ALTER TABLE rentals ADD COLUMN IF NOT EXISTS gross_amount NUMERIC(12,2);
+ALTER TABLE rentals ADD COLUMN IF NOT EXISTS discount_pct NUMERIC(5,2)  NOT NULL DEFAULT 0;
+ALTER TABLE rentals ADD COLUMN IF NOT EXISTS discount_amt NUMERIC(12,2) NOT NULL DEFAULT 0;
+UPDATE rentals SET gross_amount = subtotal WHERE gross_amount IS NULL;
+-- Default rule: under GH₵ 1,000 → no discount, GH₵ 1,000–1,500 → 5% off, above GH₵ 1,500 → 8% off
+INSERT INTO app_meta (key, value)
+VALUES ('discount_rules', '{"enabled":true,"min_amount":1000,"threshold":1500,"low_pct":5,"high_pct":8}')
+ON CONFLICT (key) DO NOTHING;
+
+-- ─── Expenses ────────────────────────────────────────────────────────────────
+-- Business costs (fuel, repairs, rent, electricity…). Deducted from revenue in Reports.
+CREATE TABLE IF NOT EXISTS expenses (
+  id              SERIAL PRIMARY KEY,
+  spent_on        DATE NOT NULL DEFAULT CURRENT_DATE,
+  category        TEXT NOT NULL,
+  description     TEXT NOT NULL,
+  amount          NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  method          TEXT NOT NULL DEFAULT 'cash',
+  paid_to         TEXT,
+  reference       TEXT,
+  equipment_id    INTEGER REFERENCES equipment(id) ON DELETE SET NULL,
+  created_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_by_name TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(spent_on);
+CREATE INDEX IF NOT EXISTS idx_expenses_eq   ON expenses(equipment_id);
