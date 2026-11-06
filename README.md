@@ -103,9 +103,10 @@ Role changes and disabled accounts take effect immediately, even for someone alr
 
 ## Rental times
 
-Pickup is always **8:00 AM** on the rental date and return is by **5:00 PM** on the return
-date (same day by default). Equipment rates are per 8am–5pm day, so a rental from Monday to
-Wednesday is charged 3 days. A rental not returned by 5:00 PM on its return date becomes Overdue.
+The pickup time is chosen on the New Rental screen (any half hour from 6:00 AM to 6:30 PM, default
+8:00 AM). Return is by **7:00 PM** on the return date (same day by default). Equipment rates are per
+day, so a rental from Monday to Wednesday is charged 3 days. A rental not returned by its return time
+becomes Overdue. Rentals made before this change keep their original 8:00 AM – 5:00 PM times.
 
 ## Advance bookings
 

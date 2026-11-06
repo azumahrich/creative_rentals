@@ -441,7 +441,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
       <div class="form-group"><label>Total Qty</label><input id="eq-total" type="number" min="1" value="1"></div>
     </div>
     <div class="input-row">
-      <div class="form-group"><label>Rate per Day, 8am–5pm (GH₵)</label><input id="eq-price" type="number" min="0" step="0.01" value="0"></div>
+      <div class="form-group"><label>Rate per Day (GH₵)</label><input id="eq-price" type="number" min="0" step="0.01" value="0"></div>
       <div class="form-group"><label>Deposit (GH₵)</label><input id="eq-deposit" type="number" min="0" step="0.01" value="0"></div>
     </div>
     <div class="modal-footer">
@@ -463,12 +463,12 @@ tr:hover td{background:rgba(255,255,255,.025)}
       <select id="rnt-client"><option value="">— select client —</option></select>
     </div>
     <div class="input-row">
-      <div class="form-group"><label>Rental Date * <span class="text-dim">(pickup 8:00 AM)</span></label><input id="rnt-start" type="date"></div>
-      <div class="form-group"><label>Return Date * <span class="text-dim">(by 5:00 PM)</span></label><input id="rnt-end" type="date"></div>
+      <div class="form-group"><label>Rental Date *</label><input id="rnt-start" type="date"></div>
+      <div class="form-group"><label>Return Date *</label><input id="rnt-end" type="date"></div>
     </div>
     <div class="input-row">
-      <div class="form-group"><label>Pickup</label><input value="8:00 AM" disabled></div>
-      <div class="form-group"><label>Return</label><input value="5:00 PM" disabled></div>
+      <div class="form-group"><label>Pickup Time *</label><select id="rnt-pickup" onchange="calcRentalTotal()"></select></div>
+      <div class="form-group"><label>Return Time</label><input value="7:00 PM" disabled></div>
     </div>
     <div class="form-group">
       <label>Equipment <span class="text-dim">— choose a category, then the item</span></label>
@@ -783,13 +783,29 @@ new MutationObserver(() => {
 // ═══════════════════════════════════════════════════════════════════
 function ghc(n) { return 'GH₵ ' + parseFloat(n||0).toLocaleString('en-GH', {minimumFractionDigits:2, maximumFractionDigits:2}); }
 function fmtDate(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}); }
-const PERIOD_LABEL = '8:00 AM – 5:00 PM';
+// Pickup time is chosen per rental; return is by 7:00 PM. Older rentals keep the times they were made with.
+const RETURN_TIME = '19:00';
+const PICKUP_TIMES = [];
+for (let m = 6 * 60; m < 19 * 60; m += 30) PICKUP_TIMES.push(String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'));
+function fmtTime(t) {
+  const m = /^\s*(\d{1,2}):(\d{2})\s*$/.exec(t || '');
+  if (!m) return t || '';
+  const h = +m[1]; return `${h % 12 || 12}:${m[2]} ${h < 12 ? 'AM' : 'PM'}`;
+}
+const pickupOf = r => r.pickup_time || '08:00', returnOf = r => r.return_time || RETURN_TIME;
+function sameDayHours(r) {
+  const toMin = t => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? +m[1] * 60 + +m[2] : null; };
+  const a = toMin(pickupOf(r)), b = toMin(returnOf(r));
+  if (a == null || b == null || b <= a) return '';
+  const mins = b - a, h = Math.floor(mins / 60), mm = mins % 60;
+  return `${h} hour${h === 1 ? '' : 's'}${mm ? ' ' + mm + ' min' : ''}`;
+}
 function periodText(r) {
   return (!r.end_date || r.start_date === r.end_date)
-    ? `${fmtDate(r.start_date)}, ${PERIOD_LABEL}`
-    : `${fmtDate(r.start_date)} 8:00 AM – ${fmtDate(r.end_date)} 5:00 PM`;
+    ? `${fmtDate(r.start_date)}, ${fmtTime(pickupOf(r))} – ${fmtTime(returnOf(r))}`
+    : `${fmtDate(r.start_date)} ${fmtTime(pickupOf(r))} – ${fmtDate(r.end_date)} ${fmtTime(returnOf(r))}`;
 }
-// 8am–5pm days from rental date to return date, inclusive (same day = 1)
+// Days from rental date to return date, inclusive (same day = 1)
 function rentalDays(s, e) { if (!s || !e || e <= s) return 1; return Math.round((Date.parse(e) - Date.parse(s)) / 86400000) + 1; }
 const ROLE_LABEL = { superadmin:'Super Admin', admin:'Admin', staff:'Staff' };
 function isAdmin() { return !!_currentUser && (_currentUser.role === 'admin' || _currentUser.role === 'superadmin'); }
@@ -1109,7 +1125,7 @@ async function renderEquipment() {
       <div class="result-note" id="eq-note"></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Name</th><th>Serial</th><th>Category</th><th>Rate/day (8am–5pm)</th><th>Deposit</th><th>Available</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Serial</th><th>Category</th><th>Rate/day</th><th>Deposit</th><th>Available</th><th></th></tr></thead>
           <tbody id="eq-tbody"></tbody>
         </table>
       </div>`;
@@ -1303,6 +1319,7 @@ async function openRentalModal() {
   _discRules = await GET('/api/rentals/discount-rules').catch(() => _discRules);
   document.getElementById('rnt-start').value = today();
   document.getElementById('rnt-end').value   = today();
+  document.getElementById('rnt-pickup').innerHTML = PICKUP_TIMES.map(t => `<option value="${t}"${t === '08:00' ? ' selected' : ''}>${fmtTime(t)}</option>`).join('');
   document.getElementById('rnt-end').min     = today();
 
   // Populate client dropdown
@@ -1439,7 +1456,7 @@ function calcRentalTotal() {
   });
   const d = discountFor(subtotal);
   document.getElementById('rnt-total-row').innerHTML =
-    `${days>1 ? days+' days' : 'Same day, 8:00 AM – 5:00 PM'} — Rental: ${ghc(d.gross)}` +
+    `${days>1 ? days+' days' : `Same day, ${fmtTime(document.getElementById('rnt-pickup').value || '08:00')} – ${fmtTime(RETURN_TIME)}`} — Rental: ${ghc(d.gross)}` +
     (d.amount ? ` <span class="text-green">− ${d.pct}% discount ${ghc(d.amount)}</span> = ${ghc(d.net)}` : '') +
     ` + Deposit: ${ghc(deposit)} = <span style="white-space:nowrap">${ghc(d.net+deposit)}</span>`;
 }
@@ -1448,6 +1465,7 @@ async function saveRental() {
   const client_id  = document.getElementById('rnt-client').value;
   const rental_date = document.getElementById('rnt-start').value;
   const return_date = document.getElementById('rnt-end').value || rental_date;
+  const pickup_time = document.getElementById('rnt-pickup').value || '08:00';
   if (!client_id)   { toast('Select a client','error'); return; }
   if (!rental_date) { toast('Rental date required','error'); return; }
   if (return_date < rental_date) { toast('Return date cannot be before the rental date','error'); return; }
@@ -1475,7 +1493,7 @@ async function saveRental() {
 
   try {
     const made = await POST('/api/rentals', {
-      client_id: parseInt(client_id), rental_date, return_date,
+      client_id: parseInt(client_id), rental_date, return_date, pickup_time,
       equipment,
       notes: document.getElementById('rnt-notes').value || null
     });
@@ -1635,8 +1653,8 @@ async function showInvoice(id) {
         <div>
           <strong style="color:#E8520A">RENTAL PERIOD</strong><br>
           ${(!r.end_date || r.start_date === r.end_date)
-            ? `Date: ${fmtDate(r.start_date)}<br>Pickup: 8:00 AM<br>Return: 5:00 PM (same day)<br>Duration: 9 hours`
-            : `Pickup: ${fmtDate(r.start_date)}, 8:00 AM<br>Return: ${fmtDate(r.end_date)}, 5:00 PM<br>Duration: ${r.days} days`}
+            ? `Date: ${fmtDate(r.start_date)}<br>Pickup: ${fmtTime(pickupOf(r))}<br>Return: ${fmtTime(returnOf(r))} (same day)${sameDayHours(r) ? '<br>Duration: ' + sameDayHours(r) : ''}`
+            : `Pickup: ${fmtDate(r.start_date)}, ${fmtTime(pickupOf(r))}<br>Return: ${fmtDate(r.end_date)}, ${fmtTime(returnOf(r))}<br>Duration: ${r.days} days`}
         </div>
       </div>
 
@@ -1704,7 +1722,7 @@ function shareWhatsApp() {
     `Adum-Kumasi, Opposite Oyerepa FM & Bosheba Building\n` +
     `Tel: 0241 334 486 | 024 816 4307\n\n` +
     `*Client:* ${r.client_name||'—'}\n` +
-    `*Period:* ${periodText(r)}${(!r.end_date||r.start_date===r.end_date)?' (9 hours)':' ('+r.days+' days)'}\n\n` +
+    `*Period:* ${periodText(r)}${(!r.end_date||r.start_date===r.end_date)?(sameDayHours(r)?' ('+sameDayHours(r)+')':''):' ('+r.days+' days)'}\n\n` +
     `*Items:*\n${items}\n\n` +
     (+r.discount_amt > 0
       ? `*Subtotal:* ${ghc(r.gross_amount)}\n*Discount (${+r.discount_pct}%):* − ${ghc(r.discount_amt)}\n*Rental after discount:* ${ghc(subtotal)}\n`

@@ -9,12 +9,14 @@ const { getRules, discountFor } = require('../middleware/pricing');
 // One-line description of a rental for the activity log
 async function describe(q, rentalId) {
   const { rows: [r] } = await q.query(
-    `SELECT r.id, r.client_id, r.start_date, r.end_date, r.days, r.status, r.subtotal, r.deposit_amt, r.total_paid, r.discount_pct, r.discount_amt, c.name AS client,
+    `SELECT r.id, r.client_id, r.start_date, r.end_date, r.pickup_time, r.return_time, r.days, r.status, r.subtotal, r.deposit_amt, r.total_paid, r.discount_pct, r.discount_amt, c.name AS client,
             (SELECT string_agg(CASE WHEN re.qty > 1 THEN re.qty || ' × ' || e.name ELSE e.name END, ', ')
                FROM rental_equipment re JOIN equipment e ON e.id = re.equipment_id WHERE re.rental_id = r.id) AS items
      FROM rentals r JOIN clients c ON c.id = r.client_id WHERE r.id=$1`, [rentalId]);
   if (!r) return { text: '#R-' + String(rentalId).padStart(4, '0'), client_id: null };
-  const dates = r.start_date === r.end_date ? r.start_date : `${r.start_date} → ${r.end_date}`;
+  const t = x => /^\d{1,2}:\d{2}$/.test(x || '') ? hhmm(x) : (x || '');
+  const dates = r.start_date === r.end_date ? `${r.start_date} ${t(r.pickup_time)}–${t(r.return_time)}`
+                                            : `${r.start_date} ${t(r.pickup_time)} → ${r.end_date} ${t(r.return_time)}`;
   return { r, client_id: r.client_id,
     text: `#R-${String(r.id).padStart(4,'0')} for ${r.client} — ${r.items || 'no items'}, ${dates}, ${money(r.subtotal)}${+r.discount_amt ? ` (after ${+r.discount_pct}% discount of ${money(r.discount_amt)})` : ''} + deposit ${money(r.deposit_amt)}` };
 }
@@ -25,7 +27,7 @@ router.use(requireAuth);
  * Rental life-cycle
  *   booked   → made for a future date. Holds the dates but does NOT take stock yet.
  *   active   → equipment is with the client (picked up). Stock is taken out.
- *   overdue  → active and not returned by 5:00 PM on the return date.
+ *   overdue  → active and not returned by its return time (7:00 PM) on the return date.
  *   returned → back in the shop. Stock is put back.
  *   cancelled→ a booking that won't go ahead (no-show / client cancelled).
  *
@@ -54,13 +56,18 @@ async function enrichRental(row, client) {
 const ref = id => '#R-' + String(id).padStart(4, '0');
 const fmtDay = d => new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
-// Rentals start at 8:00 AM on the rental date and end at 5:00 PM on the return date
-// (same day by default). Charged per 8am–5pm day.
-const RENTAL_START = '08:00', RENTAL_END = '17:00';
+// Pickup time is chosen when the rental is made (default 8:00 AM, any half hour 6:00 AM – 6:30 PM).
+// Return is by 7:00 PM on the return date (same day by default). Charged per day.
+const RENTAL_START = '08:00', RENTAL_END = '19:00';
+const PICKUP_TIMES = [];
+for (let m = 6 * 60; m < 19 * 60; m += 30) PICKUP_TIMES.push(String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'));
+const hhmm = t => { const [h, m] = t.split(':').map(Number); return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
 
-// Active rentals not returned by 5:00 PM (Ghana time) on their date become overdue
+// Active rentals not returned by their return time (Ghana time) on the return date become overdue.
+// Each rental keeps the return time it was made with (rentals made before this change: 5:00 PM).
 const OVERDUE_SQL = `UPDATE rentals SET status='overdue'
-  WHERE status='active' AND (end_date + TIME '17:00') < (NOW() AT TIME ZONE 'Africa/Accra')`;
+  WHERE status='active' AND (end_date + CASE WHEN return_time ~ '^\\s*\\d{1,2}:\\d{2}' THEN return_time::time ELSE TIME '19:00' END)
+        < (NOW() AT TIME ZONE 'Africa/Accra')`;
 const markOverdue = () => db.query(OVERDUE_SQL);
 
 // Take / put back physical stock for a rental's items (inside a transaction)
@@ -154,6 +161,9 @@ router.post('/', async (req, res) => {
   if (return_date < rental_date)
     return res.status(400).json({ error: 'Return date cannot be before the rental date' });
   const start_date = rental_date, end_date = return_date;
+  const pickup_time = req.body.pickup_time || RENTAL_START;
+  if (!PICKUP_TIMES.includes(pickup_time))
+    return res.status(400).json({ error: 'Choose a pickup time between 6:00 AM and 6:30 PM' });
   const days = Math.round((Date.parse(end_date) - Date.parse(start_date)) / 86400000) + 1;
 
   // Add up quantities per item (two rows can pick the same item)
@@ -207,7 +217,7 @@ router.post('/', async (req, res) => {
                             deposit_amt, pickup_time, return_time, notes)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
       [client_id, start_date, end_date, days, status, disc.net, disc.gross, disc.pct, disc.amount,
-       deposit, RENTAL_START, RENTAL_END, notes||null]
+       deposit, pickup_time, RENTAL_END, notes||null]
     );
     for (const item of equipment) {
       await pgClient.query(
