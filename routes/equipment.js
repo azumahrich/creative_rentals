@@ -1,4 +1,6 @@
 const router = require('express').Router();
+// IDs in the address must be whole numbers (anything else is simply 'not found')
+router.param('id', (req, res, next, id) => /^\d{1,9}$/.test(id) ? next() : res.status(404).json({ error: 'Not found' }));
 const db     = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { note, diff, money } = require('../middleware/activity');
@@ -55,7 +57,9 @@ router.get('/:id', async (req, res) => {
 // POST /api/equipment  (admin only)
 router.post('/', requireAdmin, async (req, res) => {
   const { serial, name, category, price, deposit, available, total } = req.body;
-  if (!name || !category) return res.status(400).json({ error: 'name and category required' });
+  if (!String(name || '').trim() || !String(category || '').trim()) return res.status(400).json({ error: 'name and category required' });
+  const badMoney = v => v !== undefined && v !== null && v !== '' && !(+v >= 0);
+  if (badMoney(price) || badMoney(deposit)) return res.status(400).json({ error: 'Rate and deposit must be 0 or more' });
   const tot = total !== undefined ? Math.max(1, parseInt(total) || 1) : 1;
   try {
     const { rows } = await db.query(
@@ -78,19 +82,27 @@ router.post('/', requireAdmin, async (req, res) => {
 // Changing the total quantity adjusts "available" by the same amount, so units
 // currently out on rental stay counted as out.
 router.patch('/:id', requireAdmin, async (req, res) => {
+  const c = await db.connect();
   try {
-    const { rows: found } = await db.query('SELECT * FROM equipment WHERE id=$1', [req.params.id]);
-    if (!found.length) return res.status(404).json({ error: 'Equipment not found' });
+    await c.query('BEGIN');
+    const { rows: found } = await c.query('SELECT * FROM equipment WHERE id=$1 FOR UPDATE', [req.params.id]);
+    if (!found.length) { await c.query('ROLLBACK'); return res.status(404).json({ error: 'Equipment not found' }); }
     const cur = found[0];
 
     const body = { ...req.body };
+    const fail = async (code, msg) => { await c.query('ROLLBACK'); return res.status(code).json({ error: msg }); };
+    const badMoney = v => v !== undefined && v !== null && v !== '' && !(+v >= 0);
+    if (badMoney(body.price) || badMoney(body.deposit)) return fail(400, 'Rate and deposit must be 0 or more');
+    if (body.name !== undefined && !String(body.name).trim()) return fail(400, 'Name is required');
+    // "available" is always worked out here from what is actually out — never taken from the form,
+    // because a form left open while a rental went out would put the stock count back wrong.
+    delete body.available;
     if (body.total !== undefined) {
       const newTotal = Math.max(1, parseInt(body.total) || 1);
       const out = cur.total - cur.available;                 // units currently rented out
-      if (newTotal < out)
-        return res.status(400).json({ error: `${out} of this item are out on rental, so the total can't be less than ${out}` });
+      if (newTotal < out) return fail(400, `${out} of this item are out on rental, so the total can't be less than ${out}`);
       body.total = newTotal;
-      if (body.available === undefined) body.available = newTotal - out;
+      body.available = newTotal - out;
     }
 
     const fields = ['serial','name','category','price','deposit','available','total'];
@@ -99,19 +111,21 @@ router.patch('/:id', requireAdmin, async (req, res) => {
     fields.forEach(f => {
       if (body[f] !== undefined) { updates.push(`${f}=$${i++}`); vals.push(f === 'serial' ? (body[f] || null) : body[f]); }
     });
-    if (!updates.length) return res.status(400).json({ error: 'Nothing to update' });
+    if (!updates.length) return fail(400, 'Nothing to update');
 
     vals.push(req.params.id);
-    const { rows } = await db.query(
+    const { rows } = await c.query(
       `UPDATE equipment SET ${updates.join(',')} WHERE id=$${i} RETURNING *`, vals);
+    await c.query('COMMIT');
     const changes = diff(cur, rows[0], ['name','serial','category','price','deposit','total']);
     if (changes.length) note(res, { action: 'equipment_update', entity: 'equipment', entity_id: rows[0].id, changes,
       summary: `Edited equipment ${rows[0].name}: ` + changes.map(c => `${c.field} ${c.from} → ${c.to}`).join('; ') });
     res.json(rows[0]);
   } catch (err) {
+    await c.query('ROLLBACK').catch(() => {});
     if (err.code === '23505') return res.status(409).json({ error: 'Serial number already exists' });
     res.status(500).json({ error: err.message });
-  }
+  } finally { c.release(); }
 });
 
 // PUT /api/equipment/:id/photo  (admin only) — body: { image: "data:image/jpeg;base64,..." }

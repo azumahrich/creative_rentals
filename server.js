@@ -3,11 +3,35 @@ const express = require('express');
 const cors    = require('cors');
 const path    = require('path');
 
+// Async route errors go to Express's error handler instead of crashing the whole server
+// (Express 4 doesn't catch a failed await by itself).
+{
+  const Layer = require('express/lib/router/layer');
+  const handle = Layer.prototype.handle_request;
+  Layer.prototype.handle_request = function (req, res, next) {
+    if (this.handle.length > 3) return handle.call(this, req, res, next);
+    try {
+      const out = this.handle(req, res, next);
+      if (out && typeof out.catch === 'function') out.catch(next);
+    } catch (err) { next(err); }
+  };
+}
+process.on('unhandledRejection', err => console.error('[unhandled]', err && err.stack || err));
+
 const app = express();
+app.disable('x-powered-by');
 app.set('trust proxy', 1);   // Render sits in front of the app; this gives the real visitor IP for the activity log
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors());
+// Basic security headers
+app.use((req, res, next) => {
+  res.set({ 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'SAMEORIGIN',
+            'Referrer-Policy': 'no-referrer',                      // keeps "Forgot password" links out of other sites' logs
+            'Permissions-Policy': 'camera=(self), microphone=(), geolocation=()' });
+  if (req.path.startsWith('/api/')) res.set('Cache-Control', 'no-store');
+  next();
+});
 app.use(express.json({ limit: '20mb' }));   // large enough for backup imports
 app.use(express.urlencoded({ extended: true }));
 
@@ -23,6 +47,18 @@ app.use('/api/expenses',  require('./routes/expenses'));
 app.use('/api/reports',   require('./routes/reports'));
 app.use('/api/admin',     require('./routes/admin'));
 app.use('/api/activity',  require('./routes/activity'));
+app.use('/api/email',     require('./routes/email'));
+
+// Unknown API address → JSON 404 (not the app page)
+app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
+// Any error inside an API route → a short JSON message, and the server keeps running
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  if (err.type === 'entity.too.large') return res.status(413).json({ error: 'That upload is too large' });
+  if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'The request could not be read' });
+  console.error('[error]', req.method, req.originalUrl, err && err.stack || err);
+  res.status(500).json({ error: 'Something went wrong on the server — please try again' });
+});
 
 // ─── Serve Frontend ───────────────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, 'public')));
@@ -128,5 +164,5 @@ async function emergencySuperAdminReset() {
 
 setupDatabase()
   .then(emergencySuperAdminReset)
-  .then(() => app.listen(PORT, () => console.log(`Creative Rentals running on port ${PORT}`)))
+  .then(() => app.listen(PORT, () => { console.log(`Creative Rentals running on port ${PORT}`); require('./lib/scheduler').start(); }))
   .catch(err => { console.error('Database setup failed: ' + describeDbError(err)); process.exit(1); });

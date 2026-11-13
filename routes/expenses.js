@@ -1,4 +1,6 @@
 const router = require('express').Router();
+// IDs in the address must be whole numbers (anything else is simply 'not found')
+router.param('id', (req, res, next, id) => /^\d{1,9}$/.test(id) ? next() : res.status(404).json({ error: 'Not found' }));
 const db     = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const activity = require('../middleware/activity');
@@ -61,12 +63,17 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const { error, data } = clean(req.body || {}, false);
   if (error) return res.status(400).json({ error });
+  const request_id = String((req.body || {}).request_id || '').slice(0, 80) || null;
   try {
+    if (request_id) {
+      const { rows: [dup] } = await db.query(`${SELECT} WHERE x.request_id=$1`, [request_id]);
+      if (dup) return res.status(200).json({ ...dup, duplicate: true });
+    }
     const { rows: [x] } = await db.query(
-      `INSERT INTO expenses (spent_on, category, description, amount, method, paid_to, reference, equipment_id, created_by, created_by_name)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
+      `INSERT INTO expenses (spent_on, category, description, amount, method, paid_to, reference, equipment_id, created_by, created_by_name, request_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
       [data.spent_on, data.category, data.description, data.amount, data.method || 'cash', data.paid_to || null,
-       data.reference || null, data.equipment_id || null, req.user.id, req.user.name]);
+       data.reference || null, data.equipment_id || null, req.user.id, req.user.name, request_id]);
     const { rows: [full] } = await db.query(`${SELECT} WHERE x.id=$1`, [x.id]);
     activity.note(res, { action: 'expense_create', entity: 'expense', entity_id: x.id,
       summary: `Recorded expense ${line(full)}${full.equipment_name ? ' for ' + full.equipment_name : ''}` });

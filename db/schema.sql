@@ -244,3 +244,81 @@ CREATE TABLE IF NOT EXISTS expenses (
 );
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(spent_on);
 CREATE INDEX IF NOT EXISTS idx_expenses_eq   ON expenses(equipment_id);
+
+-- ─── Email (Resend) ──────────────────────────────────────────────────────────
+-- Staff/admin email address — used for "Forgot password" links and the daily summary
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT;
+
+-- Every email the app sends (or tries to). dedupe_key stops automatic emails being sent twice.
+CREATE TABLE IF NOT EXISTS email_log (
+  id          SERIAL PRIMARY KEY,
+  at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  kind        TEXT NOT NULL,              -- invoice | return_reminder | overdue | summary | password_reset | test
+  dedupe_key  TEXT UNIQUE,
+  to_addr     TEXT NOT NULL,
+  subject     TEXT NOT NULL,
+  rental_id   INTEGER,
+  client_id   INTEGER,
+  user_id     INTEGER,
+  status      TEXT NOT NULL DEFAULT 'sending',   -- sending | sent | failed
+  provider_id TEXT,
+  error       TEXT
+);
+CREATE INDEX IF NOT EXISTS email_log_at_idx     ON email_log (at DESC);
+CREATE INDEX IF NOT EXISTS email_log_rental_idx ON email_log (rental_id);
+
+-- One-time "Forgot password" links (only a hash of the link is stored)
+CREATE TABLE IF NOT EXISTS password_resets (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash  TEXT NOT NULL UNIQUE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at  TIMESTAMPTZ NOT NULL,
+  used_at     TIMESTAMPTZ,
+  ip          TEXT
+);
+DELETE FROM password_resets WHERE created_at < NOW() - INTERVAL '30 days';
+
+-- Which emails are switched on (Super Admin → Settings → Email)
+INSERT INTO app_meta (key, value)
+VALUES ('email_settings', '{"reminders":true,"overdue":true,"summary":true,"summary_to":"","reply_to":"creativerentals25@gmail.com","summary_time":"19:30"}')
+ON CONFLICT (key) DO NOTHING;
+
+-- ─── Double-save protection ──────────────────────────────────────────────────
+-- The app sends a one-time ID with each new payment / rental / expense. If the same save
+-- arrives twice (double tap, slow connection, retry) the second one is recognised and not stored again.
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS request_id TEXT;
+ALTER TABLE rentals  ADD COLUMN IF NOT EXISTS request_id TEXT;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS request_id TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS payments_request_id_uq ON payments (request_id) WHERE request_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS rentals_request_id_uq  ON rentals  (request_id) WHERE request_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS expenses_request_id_uq ON expenses (request_id) WHERE request_id IS NOT NULL;
+
+-- ─── Permanent delete needs Super Admin approval ─────────────────────────────
+-- Admins ask for a rental to be deleted (with a reason); only the Super Admin can approve.
+ALTER TABLE rentals ADD COLUMN IF NOT EXISTS delete_requested_at      TIMESTAMPTZ;
+ALTER TABLE rentals ADD COLUMN IF NOT EXISTS delete_requested_by      INTEGER;
+ALTER TABLE rentals ADD COLUMN IF NOT EXISTS delete_requested_by_name TEXT;
+ALTER TABLE rentals ADD COLUMN IF NOT EXISTS delete_reason            TEXT;
+
+-- ─── Booking changes need Super Admin approval ───────────────────────────────
+-- Staff/admins propose a change to a booking (dates, time, items, client, notes); it only takes
+-- effect when the Super Admin approves it. Super Admin edits apply straight away (recorded here too).
+CREATE TABLE IF NOT EXISTS rental_changes (
+  id               SERIAL PRIMARY KEY,
+  rental_id        INTEGER NOT NULL REFERENCES rentals(id) ON DELETE CASCADE,
+  status           TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected','withdrawn','applied')),
+  requested_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  requested_by     INTEGER,
+  requested_by_name TEXT,
+  reason           TEXT,
+  proposed         JSONB NOT NULL,        -- the full new booking (client, dates, time, items, notes)
+  summary          TEXT,                  -- short "what changes" line
+  changes          JSONB,                 -- [{field, from, to}]
+  decided_at       TIMESTAMPTZ,
+  decided_by       INTEGER,
+  decided_by_name  TEXT,
+  decision_note    TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS rental_changes_one_pending ON rental_changes (rental_id) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS rental_changes_rental_idx ON rental_changes (rental_id, id DESC);

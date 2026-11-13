@@ -34,6 +34,12 @@ function checkClientIds(body, partial = false) {
     if (!p) return 'Phone number must be a 10-digit Ghana number, e.g. 024 123 4567';
     body.phone = p;
   }
+  if (body.name !== undefined) body.name = String(body.name || '').trim().replace(/\s+/g, ' ');
+  if (body.email !== undefined) {
+    const e = String(body.email || '').trim().toLowerCase();
+    if (e && !/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]{2,}$/.test(e)) return 'That email address is not valid';
+    body.email = e || null;
+  }
   return null;
 }
 

@@ -17,20 +17,21 @@ router.get('/summary', requireAdmin, async (req, res) => {
   // (so multi-day rentals and advance bookings are included, not just ones that have ended)
   const where  = ['1=1'];
   const params = [];
-  let i = 1;
-  if (to)           { where.push(`r.start_date <= $${i++}`); params.push(to); }
-  if (from)         { where.push(`r.end_date   >= $${i++}`); params.push(from); }
-  if (client_id)    { where.push(`r.client_id   = $${i++}`); params.push(client_id); }
-  if (equipment_id) {
-    where.push(`EXISTS (SELECT 1 FROM rental_equipment re2 WHERE re2.rental_id=r.id AND re2.equipment_id=$${i++})`);
-    params.push(equipment_id);
-  }
+  if ((client_id && !/^\d+$/.test(client_id)) || (equipment_id && !/^\d+$/.test(equipment_id)))
+    return res.status(400).json({ error: 'Invalid client or equipment' });
+  // Remember each value's own $n position (from and to can be the same date, so indexOf can't be used)
+  const at = {};
+  const add = (name, v) => { params.push(v); at[name] = params.length; return '$' + params.length; };
+  if (to)           where.push(`r.start_date <= ${add('to', to)}`);
+  if (from)         where.push(`r.end_date   >= ${add('from', from)}`);
+  if (client_id)    where.push(`r.client_id   = ${add('client', client_id)}`);
+  if (equipment_id) where.push(`EXISTS (SELECT 1 FROM rental_equipment re2 WHERE re2.rental_id=r.id AND re2.equipment_id=${add('equipment', equipment_id)})`);
   const cond = where.join(' AND ');
   const live = `${cond} AND r.status <> 'cancelled'`;
   // Expenses count on the day the money was spent
   const xw = ['1=1'];
-  if (to)   xw.push(`x.spent_on <= $${params.indexOf(to) + 1}`);
-  if (from) xw.push(`x.spent_on >= $${params.indexOf(from) + 1}`);
+  if (to)   xw.push(`x.spent_on <= $${at.to}`);
+  if (from) xw.push(`x.spent_on >= $${at.from}`);
   const xcond = xw.join(' AND ');   // cancelled bookings don't count as business
 
   try {
@@ -46,8 +47,11 @@ router.get('/summary', requireAdmin, async (req, res) => {
         COALESCE(SUM(COALESCE(gross_amount, subtotal)) FILTER (WHERE status <> 'cancelled'),0) AS before_discount,
         COALESCE(SUM(discount_amt) FILTER (WHERE status <> 'cancelled'),0) AS discounts,
         COALESCE(SUM(deposit_amt) FILTER (WHERE status <> 'cancelled'),0) AS deposits,
-        COALESCE(SUM(total_paid),0)                                       AS collected,
-        COALESCE(SUM(subtotal + deposit_amt - total_paid) FILTER (WHERE status <> 'cancelled'),0) AS outstanding
+        COALESCE(SUM(total_paid)  FILTER (WHERE status <> 'cancelled'),0) AS collected,
+        COALESCE(SUM(subtotal + deposit_amt - total_paid) FILTER (WHERE status <> 'cancelled'),0) AS outstanding,
+        -- Cancelled bookings are kept apart: their value and any money paid on them are NOT revenue
+        COALESCE(SUM(subtotal)    FILTER (WHERE status = 'cancelled'),0)  AS cancelled_value,
+        COALESCE(SUM(total_paid)  FILTER (WHERE status = 'cancelled'),0)  AS cancelled_paid
       FROM rentals r WHERE ${cond}`, params);
 
     // Every rental in range
@@ -73,7 +77,7 @@ router.get('/summary', requireAdmin, async (req, res) => {
              MAX(r.start_date)                         AS last_rental
       FROM clients c
       LEFT JOIN rentals r ON r.client_id = c.id AND ${live}
-      ${client_id ? `WHERE c.id = $${params.indexOf(client_id) + 1}` : ''}
+      ${client_id ? `WHERE c.id = $${at.client}` : ''}
       GROUP BY c.id
       ORDER BY revenue DESC, rentals DESC, c.name`, params);
 
@@ -99,7 +103,7 @@ router.get('/summary', requireAdmin, async (req, res) => {
       LEFT JOIN (SELECT equipment_id, SUM(amount) AS spent FROM expenses x WHERE ${xcond} GROUP BY equipment_id) xs ON xs.equipment_id = e.id
       LEFT JOIN equipment_photos p ON p.equipment_id = e.id
       WHERE (NOT e.archived OR u.equipment_id IS NOT NULL OR xs.equipment_id IS NOT NULL)
-        ${equipment_id ? `AND e.id = $${params.indexOf(equipment_id) + 1}` : ''}
+        ${equipment_id ? `AND e.id = $${at.equipment}` : ''}
       ORDER BY revenue DESC, times_rented DESC, e.category, e.name`, params);
 
     // Expenses for the same dates. They aren't tied to clients, so a single-client report shows none.
@@ -107,7 +111,7 @@ router.get('/summary', requireAdmin, async (req, res) => {
     if (!client_id) {
       ({ rows: expenses } = await db.query(`
         SELECT x.*, e.name AS equipment_name FROM expenses x LEFT JOIN equipment e ON e.id = x.equipment_id
-        WHERE ${xcond}${equipment_id ? ` AND x.equipment_id = $${params.indexOf(equipment_id) + 1}` : ''}
+        WHERE ${xcond}${equipment_id ? ` AND x.equipment_id = $${at.equipment}` : ''}
         ORDER BY x.spent_on DESC, x.id DESC`, params));
       const cat = {};
       for (const x of expenses) { cat[x.category] = cat[x.category] || { category: x.category, count: 0, amount: 0 }; cat[x.category].count++; cat[x.category].amount += +x.amount; }
@@ -118,7 +122,9 @@ router.get('/summary', requireAdmin, async (req, res) => {
     agg.net_profit = (+agg.gross_revenue - spent).toFixed(2);
     agg.expenses_hidden = !!client_id;
 
-    res.json({ summary: agg, rentals, by_client, by_equipment, expenses, by_category });
+    // Cancelled bookings in range, with any money paid on them (to refund or keep as agreed)
+    const cancelled = rentals.filter(r => r.status === 'cancelled');
+    res.json({ summary: agg, rentals, by_client, by_equipment, expenses, by_category, cancelled });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -138,19 +144,25 @@ router.get('/dashboard', async (req, res) => {
         (SELECT COUNT(*) FROM equipment WHERE NOT archived)   AS total_equipment,
         (SELECT COUNT(*) FROM rentals WHERE status='active')   AS active_rentals,
         (SELECT COUNT(*) FROM rentals WHERE status='overdue')  AS overdue_rentals,
-        (SELECT COUNT(*) FROM rentals WHERE status='booked')   AS booked_rentals,
+        (SELECT COUNT(*) FROM rentals WHERE status='booked'
+           AND end_date >= (NOW() AT TIME ZONE 'Africa/Accra')::date) AS booked_rentals,
+        (SELECT COUNT(*) FROM rentals WHERE status='booked'
+           AND end_date <  (NOW() AT TIME ZONE 'Africa/Accra')::date) AS missed_bookings,
+        (SELECT COUNT(*) FROM rentals WHERE delete_requested_at IS NOT NULL) AS delete_requests,
+        (SELECT COUNT(*) FROM rental_changes WHERE status = 'pending') AS change_requests,
         (SELECT COUNT(*) FROM rentals WHERE status='booked'
            AND start_date <= (NOW() AT TIME ZONE 'Africa/Accra')::date
            AND end_date   >= (NOW() AT TIME ZONE 'Africa/Accra')::date) AS pickups_today,
-        (SELECT COALESCE(SUM(amount),0) FROM payments
-         WHERE paid_at >= date_trunc('month', CURRENT_DATE)) AS month_revenue,
+        (SELECT COALESCE(SUM(p.amount),0) FROM payments p JOIN rentals r ON r.id = p.rental_id
+         WHERE r.status <> 'cancelled'
+           AND (p.paid_at AT TIME ZONE 'Africa/Accra') >= date_trunc('month', (NOW() AT TIME ZONE 'Africa/Accra'))) AS month_revenue,
         (SELECT COALESCE(SUM(amount),0) FROM expenses
          WHERE spent_on >= date_trunc('month', (NOW() AT TIME ZONE 'Africa/Accra'))::date) AS month_expenses,
         (SELECT COALESCE(SUM(subtotal+deposit_amt-total_paid),0) FROM rentals
          WHERE status IN ('active','overdue'))                  AS outstanding
     `);
     // Staff don't see money totals on the dashboard
-    if (!['admin','superadmin'].includes(req.user.role)) { delete stats.month_revenue; delete stats.outstanding; delete stats.month_expenses; }
+    if (!['admin','superadmin'].includes(req.user.role)) { delete stats.month_revenue; delete stats.outstanding; delete stats.month_expenses; delete stats.delete_requests; delete stats.change_requests; }
     res.json(stats);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

@@ -7,16 +7,18 @@ router.use(requireAuth, requireSuperAdmin);
 
 // Groups shown in the "Type" filter
 const GROUPS = {
-  signins:   ['login', 'login_failed', 'password_change', 'emergency_reset'],
+  signins:   ['login', 'login_failed', 'password_change', 'password_reset_request', 'password_reset', 'emergency_reset'],
   failed:    ['login_failed'],
-  rentals:   ['rental_create', 'booking_create', 'rental_pickup', 'rental_return', 'booking_cancel', 'rental_delete'],
+  rentals:   ['rental_create', 'booking_create', 'rental_pickup', 'rental_return', 'booking_cancel', 'rental_delete', 'rental_delete_request', 'rental_delete_reject', 'rental_delete_withdraw',
+              'booking_edit', 'booking_edit_request', 'booking_edit_approve', 'booking_edit_reject', 'booking_edit_withdraw'],
   payments:  ['payment_create', 'payment_delete'],
   clients:   ['client_create', 'client_update', 'client_delete'],
   equipment: ['equipment_create', 'equipment_update', 'equipment_photo', 'equipment_delete'],
   expenses:  ['expense_create', 'expense_update', 'expense_delete'],
   users:     ['user_create', 'user_update', 'user_delete'],
-  deletes:   ['rental_delete', 'payment_delete', 'client_delete', 'equipment_delete', 'user_delete', 'expense_delete', 'data_clear', 'booking_cancel'],
-  system:    ['data_clear', 'data_import', 'emergency_reset', 'settings_update'],
+  deletes:   ['rental_delete', 'rental_delete_request', 'rental_delete_reject', 'rental_delete_withdraw', 'payment_delete', 'client_delete', 'equipment_delete', 'user_delete', 'expense_delete', 'data_clear', 'booking_cancel'],
+  emails:    ['invoice_email', 'email_test', 'email_summary', 'password_reset_request'],
+  system:    ['data_clear', 'data_import', 'emergency_reset', 'settings_update', 'email_test', 'email_summary'],
 };
 
 /**

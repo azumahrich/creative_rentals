@@ -1,4 +1,6 @@
 const router = require('express').Router();
+// IDs in the address must be whole numbers (anything else is simply 'not found')
+router.param('id', (req, res, next, id) => /^\d{1,9}$/.test(id) ? next() : res.status(404).json({ error: 'Not found' }));
 const db     = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { protectClient, isAdminRole } = require('../middleware/privacy');

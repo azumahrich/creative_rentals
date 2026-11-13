@@ -1,4 +1,7 @@
+const { isEmail } = require('../lib/email');
 const router = require('express').Router();
+// IDs in the address must be whole numbers (anything else is simply 'not found')
+router.param('id', (req, res, next, id) => /^\d{1,9}$/.test(id) ? next() : res.status(404).json({ error: 'Not found' }));
 const bcrypt = require('bcryptjs');
 const db     = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
@@ -35,7 +38,7 @@ async function activeSuperCount(excludeId) {
 router.get('/', async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT id, username, name, role, active, created_at, last_login_at, last_seen_at FROM users
+      `SELECT id, username, name, email, role, active, created_at, last_login_at, last_seen_at FROM users
        ORDER BY CASE role WHEN 'superadmin' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, id`);
     res.json(rows.map(u => ({ ...u, can_manage: canManage(req.user, u) })));
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -45,7 +48,9 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const { username, password, name } = req.body;
   const role = req.body.role || 'staff';
+  const email = String(req.body.email || '').trim().toLowerCase() || null;
   if (!username || !password || !name) return res.status(400).json({ error: 'username, password and name required' });
+  if (email && !isEmail(email)) return res.status(400).json({ error: 'That email address is not valid' });
   if (!ROLES.includes(role)) return res.status(400).json({ error: 'Invalid role' });
   if (role !== 'staff' && !isSuper(req.user))
     return res.status(403).json({ error: 'Only the Super Admin can create admin accounts' });
@@ -53,9 +58,9 @@ router.post('/', async (req, res) => {
   try {
     const hash = await bcrypt.hash(password, 10);
     const { rows } = await db.query(
-      `INSERT INTO users (username, password, name, role)
-       VALUES ($1,$2,$3,$4) RETURNING id, username, name, role, active, created_at`,
-      [username.trim().toLowerCase(), hash, name.trim(), role]
+      `INSERT INTO users (username, password, name, role, email)
+       VALUES ($1,$2,$3,$4,$5) RETURNING id, username, name, email, role, active, created_at`,
+      [username.trim().toLowerCase(), hash, name.trim(), role, email]
     );
     note(res, { action: 'user_create', entity: 'user', entity_id: rows[0].id,
       summary: `Created ${ROLE_NAME[role]} account "${rows[0].username}" (${rows[0].name})` });
@@ -71,13 +76,15 @@ router.patch('/:id', async (req, res) => {
   const id = Number(req.params.id);
   const self = id === req.user.id;
   try {
-    const { rows: found } = await db.query('SELECT id, username, name, role, active FROM users WHERE id=$1', [id]);
+    const { rows: found } = await db.query('SELECT id, username, name, email, role, active FROM users WHERE id=$1', [id]);
     if (!found.length) return res.status(404).json({ error: 'User not found' });
     const target = found[0];
     if (!canManage(req.user, target))
       return res.status(403).json({ error: 'Only the Super Admin can change admin accounts' });
 
     const { name, role, active, password } = req.body;
+    const email = req.body.email === undefined ? undefined : (String(req.body.email || '').trim().toLowerCase() || null);
+    if (email && !isEmail(email)) return res.status(400).json({ error: 'That email address is not valid' });
     if (self && role !== undefined && role !== target.role)
       return res.status(400).json({ error: 'You cannot change your own role' });
     if (self && active === false)
@@ -97,13 +104,14 @@ router.patch('/:id', async (req, res) => {
     if (name     !== undefined) { updates.push(`name=$${i++}`);   vals.push(name); }
     if (role     !== undefined) { updates.push(`role=$${i++}`);   vals.push(role); }
     if (active   !== undefined) { updates.push(`active=$${i++}`); vals.push(!!active); }
+    if (email    !== undefined) { updates.push(`email=$${i++}`);  vals.push(email); }
     if (password)               { updates.push(`password=$${i++}`); vals.push(await bcrypt.hash(password, 10)); }
     if (!updates.length) return res.status(400).json({ error: 'Nothing to update' });
 
     vals.push(id);
     const { rows } = await db.query(
-      `UPDATE users SET ${updates.join(',')} WHERE id=$${i} RETURNING id, username, name, role, active`, vals);
-    const changes = diff({ ...target, role: ROLE_NAME[target.role] }, { ...rows[0], role: ROLE_NAME[rows[0].role] }, ['name','role','active']);
+      `UPDATE users SET ${updates.join(',')} WHERE id=$${i} RETURNING id, username, name, email, role, active`, vals);
+    const changes = diff({ ...target, role: ROLE_NAME[target.role] }, { ...rows[0], role: ROLE_NAME[rows[0].role] }, ['name','email','role','active']);
     if (password) changes.push({ field: 'Password', from: '••••', to: self ? 'changed' : 'reset by ' + req.user.username });
     const what = changes.map(c => c.field === 'Password' ? (self ? 'changed password' : 'reset password')
       : c.field === 'Status' ? (c.to === 'Active' ? 'enabled the account' : 'disabled the account') : `${c.field.toLowerCase()} ${c.from} → ${c.to}`);

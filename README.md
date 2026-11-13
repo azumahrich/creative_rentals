@@ -103,9 +103,10 @@ Role changes and disabled accounts take effect immediately, even for someone alr
 
 ## Rental times
 
-Pickup is always **8:00 AM** on the rental date and return is by **5:00 PM** on the return
-date (same day by default). Equipment rates are per 8am–5pm day, so a rental from Monday to
-Wednesday is charged 3 days. A rental not returned by 5:00 PM on its return date becomes Overdue.
+The pickup time is chosen on the New Rental screen (any half hour from 6:00 AM to 6:30 PM, default
+8:00 AM). Return is by **7:00 PM** on the return date (same day by default). Equipment rates are per
+day, so a rental from Monday to Wednesday is charged 3 days. A rental not returned by its return time
+becomes Overdue. Rentals made before this change keep their original 8:00 AM – 5:00 PM times.
 
 ## Advance bookings
 
@@ -144,3 +145,66 @@ with a breakdown by category and an Expenses/Net column per equipment item. Staf
 Applied automatically to every new rental's charge (never the deposit): under GH₵ 1,000 → no discount,
 GH₵ 1,000 – 1,500 → 5% off, above GH₵ 1,500 → 8% off. The Super Admin can change or switch it off in Settings. Rentals made before
 this update keep their original prices. Invoices and WhatsApp messages show the discount line.
+
+## Email (Resend)
+
+The app can send invoices to clients, return reminders, overdue notices, a daily summary to the
+Super Admin, and "Forgot password" links. It uses Resend (resend.com). Free plan: 3,000 emails a
+month, 100 a day.
+
+**Set up**
+1. Sign up at resend.com → **API Keys** → **Create API Key** (Sending access) → copy it (starts with `re_`).
+2. Resend → **Domains** → **Add Domain** (e.g. `creativerentals.com.gh` or `mail.yourdomain.com`) and add
+   the DNS records it shows at your domain provider. Wait until it says **Verified**.
+3. Render → your web service → **Environment** → add:
+   - `RESEND_API_KEY` = the key from step 1
+   - `EMAIL_FROM` = `Creative Rentals <bookings@yourdomain.com>` (an address on the verified domain)
+   Save — the app restarts.
+4. In the app: 🔑 **My account** → add your email. **Settings → Email** → **Send test**.
+
+Until a domain is verified, leave `EMAIL_FROM` out: the app sends from `onboarding@resend.dev`, which
+Resend only delivers to the email you signed up to Resend with — enough for testing, not for clients.
+
+**What is sent (Ghana time)**
+- **Invoice / booking confirmation** — 📧 Email button on any invoice (staff and admins).
+- **Return reminder** — 2 hours before the return time on the return day.
+- **Overdue notice** — when a rental becomes overdue, then each morning from 9 AM; at most 3, and only
+  for rentals due in the last 3 days.
+- **Daily summary** — to the Super Admin at 7:30 PM (time and addresses in Settings → Email).
+- **Forgot password** — link on the sign-in screen; works once, expires in 30 minutes. Staff need an
+  email on their account (Users page, or 🔑 My account).
+
+Clients only get reminders if their email is saved on the Clients page. Every email is listed in
+Settings → Email → Recent emails, and sends are recorded in the Activity Log.
+
+## Deleting rentals (Super Admin approval)
+
+Only the Super Admin can permanently delete a rental. An admin taps 🗑️ and gives a reason; the rental
+shows "Delete requested" and the Super Admin sees a banner on the Dashboard and Rentals page, then taps
+**Approve delete** or **Reject**. Every request, approval and rejection is in the Activity Log.
+To stop a booking without losing its record, cancel it instead.
+
+## Cancelled bookings and money
+
+Cancelled bookings — and any payments made on them — are not counted in revenue, "Collected",
+"Outstanding", the dashboard or the daily summary. Reports list them separately under
+**Cancelled Bookings** with the amount paid, so you can refund it or keep it as agreed.
+New payments can't be added to a cancelled booking.
+
+## Double saves
+
+Each new payment, rental and expense carries a one-time ID, so a double tap or a retry on a slow
+connection can never save it twice. The Payments page flags older likely double entries (same rental,
+same amount, within 5 minutes) and admins can delete a payment there.
+
+## Editing bookings (Super Admin approval)
+
+A booking that hasn't been picked up yet can be edited with ✏️ — client, dates, pickup time,
+equipment and notes. Staff and admins give a reason and the change waits for the Super Admin; the
+booking stays as it was until then. The Super Admin sees a banner, taps **Review change** to see
+what changes (before → after) and approves or rejects it. The Super Admin's own edits apply at once.
+
+Availability is checked when the change is asked for and again at approval. Items already on the
+booking keep the rate they were booked at; new items use today's rate; the loyalty discount is
+worked out again. Payments already made stay on the booking. If the booking is picked up or cancelled
+before anyone decides, the waiting change is closed. Every request and decision is in the Activity Log.

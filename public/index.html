@@ -30,6 +30,25 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--primary);color
 .auth-box img{display:block;margin:0 auto 24px;background:#fff;border-radius:12px;padding:10px 14px;width:240px;max-width:100%;height:auto}
 .auth-box h2{text-align:center;font-size:1.3rem;margin-bottom:24px;color:var(--text-dim)}
 .auth-error{background:#7f1d1d;color:#fca5a5;padding:10px 14px;border-radius:8px;font-size:.87rem;margin-bottom:16px;display:none}
+.del-req{margin-top:6px;font-size:.74rem;color:#fbbf24;line-height:1.35}
+.del-req span{color:var(--text-dim)}
+.chg-req{margin-top:6px;font-size:.74rem;color:#93c5fd;line-height:1.35}
+.chg-req span{color:var(--text-dim)}
+.del-banner.chg{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.4)}
+tr.row-del-req{background:rgba(234,179,8,.06)}
+.del-banner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.4);padding:10px 14px;border-radius:10px;margin-bottom:14px;font-size:.9rem}
+.is-busy{opacity:.6;cursor:progress}
+.auth-ok{background:#14532d;color:#bbf7d0;padding:10px 14px;border-radius:8px;font-size:.87rem;margin-bottom:16px;line-height:1.45}
+.auth-link{display:block;margin-top:14px;text-align:center;font-size:.87rem;color:var(--accent);background:none;border:0;cursor:pointer;width:100%}
+.auth-link:hover{text-decoration:underline}
+[hidden]{display:none !important}
+.mail-status{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:10px;font-size:.88rem;line-height:1.5;margin-bottom:14px}
+.mail-status.ok{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35)}
+.mail-status.warn{background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.4)}
+.mail-status.off{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35)}
+.mail-toggle{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;font-size:.9rem}
+.mail-toggle input{width:auto;margin-top:3px}
+.mail-toggle small{display:block;color:var(--text-dim);font-size:.8rem;margin-top:2px}
 
 /* ─── Layout ────────────────────────────────────────── */
 #app{display:none;flex-direction:row;min-height:100vh}
@@ -295,6 +314,20 @@ tr:hover td{background:rgba(255,255,255,.025)}
         <input type="password" id="inp-password" autocomplete="current-password" required>
       </div>
       <button type="submit" class="btn btn-primary w-full" id="login-btn">Sign In</button>
+      <button type="button" class="auth-link" id="forgot-link" hidden onclick="showAuthPanel('forgot')">Forgot password?</button>
+    </form>
+    <form id="forgot-form" class="auth-panel" hidden onsubmit="doForgot(event)">
+      <p class="text-dim" style="font-size:.88rem;margin-bottom:14px;line-height:1.5">Enter your username or email. We'll email you a link to choose a new password.</p>
+      <div class="form-group"><label>Username or email</label><input type="text" id="inp-forgot" autocomplete="username" required></div>
+      <button type="submit" class="btn btn-primary w-full" id="forgot-btn">Email me a reset link</button>
+      <button type="button" class="auth-link" onclick="showAuthPanel('login')">← Back to sign in</button>
+    </form>
+    <form id="reset-form" class="auth-panel" hidden onsubmit="doReset(event)">
+      <p class="text-dim" id="reset-who" style="font-size:.88rem;margin-bottom:14px"></p>
+      <div class="form-group"><label>New password <span class="text-dim">(at least 6 characters)</span></label><input type="password" id="inp-reset1" autocomplete="new-password" required></div>
+      <div class="form-group"><label>Type it again</label><input type="password" id="inp-reset2" autocomplete="new-password" required></div>
+      <button type="submit" class="btn btn-primary w-full" id="reset-btn">Save new password</button>
+      <button type="button" class="auth-link" onclick="showAuthPanel('login')">← Back to sign in</button>
     </form>
   </div>
 </div>
@@ -360,7 +393,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
           <div class="user-role" id="user-role-display">—</div>
         </div>
       </div>
-      <button class="btn-logout" onclick="openMyPassword()">🔑 Change my password</button>
+      <button class="btn-logout" onclick="openMyPassword()">🔑 My account</button>
       <button class="btn-logout" onclick="doLogout()">Sign Out</button>
     </div>
   </nav>
@@ -441,7 +474,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
       <div class="form-group"><label>Total Qty</label><input id="eq-total" type="number" min="1" value="1"></div>
     </div>
     <div class="input-row">
-      <div class="form-group"><label>Rate per Day, 8am–5pm (GH₵)</label><input id="eq-price" type="number" min="0" step="0.01" value="0"></div>
+      <div class="form-group"><label>Rate per Day (GH₵)</label><input id="eq-price" type="number" min="0" step="0.01" value="0"></div>
       <div class="form-group"><label>Deposit (GH₵)</label><input id="eq-deposit" type="number" min="0" step="0.01" value="0"></div>
     </div>
     <div class="modal-footer">
@@ -455,7 +488,7 @@ tr:hover td{background:rgba(255,255,255,.025)}
 <div class="modal-overlay" id="modal-rental">
   <div class="modal modal-lg">
     <div class="modal-header">
-      <span class="modal-title">New Rental</span>
+      <span class="modal-title" id="rnt-title">New Rental</span>
       <button class="modal-close" onclick="closeModal('modal-rental')">&times;</button>
     </div>
     <div class="form-group">
@@ -463,12 +496,12 @@ tr:hover td{background:rgba(255,255,255,.025)}
       <select id="rnt-client"><option value="">— select client —</option></select>
     </div>
     <div class="input-row">
-      <div class="form-group"><label>Rental Date * <span class="text-dim">(pickup 8:00 AM)</span></label><input id="rnt-start" type="date"></div>
-      <div class="form-group"><label>Return Date * <span class="text-dim">(by 5:00 PM)</span></label><input id="rnt-end" type="date"></div>
+      <div class="form-group"><label>Rental Date *</label><input id="rnt-start" type="date"></div>
+      <div class="form-group"><label>Return Date *</label><input id="rnt-end" type="date"></div>
     </div>
     <div class="input-row">
-      <div class="form-group"><label>Pickup</label><input value="8:00 AM" disabled></div>
-      <div class="form-group"><label>Return</label><input value="5:00 PM" disabled></div>
+      <div class="form-group"><label>Pickup Time *</label><select id="rnt-pickup" onchange="calcRentalTotal()"></select></div>
+      <div class="form-group"><label>Return Time</label><input value="7:00 PM" disabled></div>
     </div>
     <div class="form-group">
       <label>Equipment <span class="text-dim">— choose a category, then the item</span></label>
@@ -476,12 +509,26 @@ tr:hover td{background:rgba(255,255,255,.025)}
       <button class="btn btn-secondary btn-sm" onclick="addEquipmentRow()">+ Add Item</button>
     </div>
     <div class="form-group"><label>Notes</label><textarea id="rnt-notes" rows="2" placeholder="Any additional notes…"></textarea></div>
+    <div class="form-group" id="rnt-reason-group" hidden><label>Reason for the change * <span class="text-dim">— the Super Admin sees this</span></label>
+      <input id="rnt-reason" placeholder="e.g. Client moved the event to Saturday"></div>
     <div id="rnt-booking-note" class="booking-note" style="display:none"></div>
     <div id="rnt-total-row" style="text-align:right;font-weight:700;color:var(--accent);margin-top:8px;font-size:1.05rem"></div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-rental')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveRental()">Create Rental</button>
+      <button class="btn btn-primary" id="rnt-save" onclick="saveRental()">Create Rental</button>
     </div>
+  </div>
+</div>
+
+<!-- Review Booking Change Modal (Super Admin) -->
+<div class="modal-overlay" id="modal-change">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title" id="chg-title">Booking change</span>
+      <button class="modal-close" onclick="closeModal('modal-change')">&times;</button>
+    </div>
+    <div id="chg-body"></div>
+    <div class="modal-footer" id="chg-footer"></div>
   </div>
 </div>
 
@@ -558,7 +605,25 @@ tr:hover td{background:rgba(255,255,255,.025)}
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="window.print()">🖨 Print</button>
       <button class="btn btn-primary" id="btn-whatsapp" onclick="shareWhatsApp()">📲 Share WhatsApp</button>
+      <button class="btn btn-primary" id="btn-email-invoice" hidden onclick="openEmailInvoice()">📧 Email</button>
       <button class="btn btn-secondary" onclick="closeModal('modal-invoice')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Email Invoice Modal -->
+<div class="modal-overlay" id="modal-mail">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="mail-title">Email invoice</span>
+      <button class="modal-close" onclick="closeModal('modal-mail')">&times;</button>
+    </div>
+    <div class="form-group"><label>Send to</label><input id="mail-to" type="email" placeholder="client@example.com" autocomplete="off">
+      <div class="text-dim" id="mail-note" style="font-size:.78rem;margin-top:4px"></div></div>
+    <div id="mail-history" style="font-size:.82rem"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-mail')">Cancel</button>
+      <button class="btn btn-primary" id="mail-send" onclick="sendInvoiceEmail()">📧 Send email</button>
     </div>
   </div>
 </div>
@@ -567,9 +632,14 @@ tr:hover td{background:rgba(255,255,255,.025)}
 <div class="modal-overlay" id="modal-mypw">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title">Change my password</span>
+      <span class="modal-title">My account</span>
       <button class="modal-close" onclick="closeModal('modal-mypw')">&times;</button>
     </div>
+    <div class="form-group"><label>My email <span class="text-dim">— for "Forgot password" links${''}</span></label>
+      <div style="display:flex;gap:8px"><input id="my-email" type="email" placeholder="you@example.com" autocomplete="email" style="flex:1">
+      <button class="btn btn-secondary" onclick="saveMyEmail()">Save email</button></div>
+      <div class="text-dim" id="my-email-note" style="font-size:.78rem;margin-top:4px"></div></div>
+    <h4 style="margin:18px 0 10px;font-size:.95rem">Change my password</h4>
     <div class="form-group"><label>Current password</label><input id="mypw-current" type="password" autocomplete="current-password"></div>
     <div class="form-group"><label>New password <span class="text-dim">(at least 6 characters)</span></label><input id="mypw-new" type="password" autocomplete="new-password"></div>
     <div class="form-group"><label>Type the new password again</label><input id="mypw-new2" type="password" autocomplete="new-password"></div>
@@ -591,6 +661,8 @@ tr:hover td{background:rgba(255,255,255,.025)}
       <div class="form-group"><label>Full Name *</label><input id="usr-name" placeholder="Full name"></div>
       <div class="form-group"><label>Username *</label><input id="usr-username" placeholder="username"></div>
     </div>
+    <div class="form-group"><label>Email <span class="text-dim">— for "Forgot password" links (and the daily summary for Super Admins)</span></label>
+      <input id="usr-email" type="email" placeholder="name@example.com" autocomplete="off"></div>
     <div class="input-row">
       <div class="form-group"><label>Password *</label><input id="usr-password" type="password" placeholder="Min 6 characters"></div>
       <div class="form-group"><label>Role</label>
@@ -636,16 +708,43 @@ const BASE = window.location.origin;
 let _token = localStorage.getItem('cr_token') || '';
 let _currentUser = JSON.parse(localStorage.getItem('cr_user') || 'null');
 
-async function api(method, path, body) {
-  const opts = {
-    method,
-    headers: { 'Content-Type': 'application/json', ..._token ? { Authorization: 'Bearer ' + _token } : {} }
-  };
-  if (body) opts.body = JSON.stringify(body);
-  const r = await fetch(BASE + path, opts);
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.error || r.statusText);
-  return data;
+// Remember which button was tapped, so it can be locked while its save is running
+let _lastBtn = null, _lastBtnAt = 0;
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (b) { _lastBtn = b; _lastBtnAt = Date.now(); } }, true);
+const _inFlight = new Map();
+// One-time ID for each new payment / rental / expense, so the server can spot a repeat
+const newReqId = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+
+// All server calls go through here.
+//  • A save that is already running is never sent twice (double taps on a slow connection).
+//  • The button that started a save is locked until it finishes.
+//  • An expired sign-in sends you back to the sign-in screen.
+function api(method, path, body) {
+  const key = method + ' ' + path + ' ' + (body ? JSON.stringify(body) : '');
+  if (method !== 'GET' && _inFlight.has(key)) return _inFlight.get(key);
+  const btn = method !== 'GET' && _lastBtn && Date.now() - _lastBtnAt < 1500 && !_lastBtn.disabled ? _lastBtn : null;
+  if (btn) { btn.disabled = true; btn.classList.add('is-busy'); }
+  const p = (async () => {
+    const opts = { method, headers: { 'Content-Type': 'application/json', ..._token ? { Authorization: 'Bearer ' + _token } : {} } };
+    if (body) opts.body = JSON.stringify(body);
+    let r;
+    try { r = await fetch(BASE + path, opts); }
+    catch { throw new Error(navigator.onLine === false ? 'No internet connection — check it and try again' : 'Could not reach the server — check your internet and try again'); }
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 401 && _token && !path.startsWith('/api/auth/login')) {
+      doLogout();
+      const err = document.getElementById('auth-error');
+      if (err) { err.className = 'auth-error'; err.textContent = data.error === 'Account disabled or removed' ? 'Your account has been disabled. Contact your admin.' : 'Your session has ended — please sign in again.'; err.style.display = 'block'; }
+      throw new Error('Please sign in again');
+    }
+    if (!r.ok) throw new Error(data.error || r.statusText);
+    return data;
+  })();
+  if (method !== 'GET') {
+    _inFlight.set(key, p);
+    p.finally(() => { _inFlight.delete(key); if (btn) { btn.disabled = false; btn.classList.remove('is-busy'); } }).catch(() => {});
+  }
+  return p;
 }
 const GET    = (path)        => api('GET',    path);
 const POST   = (path, body)  => api('POST',   path, body);
@@ -680,12 +779,63 @@ async function doLogin(e) {
   }
 }
 
+// ── Forgot / reset password ─────────────────────────────────────────
+let _resetToken = '';
+function showAuthPanel(which, msg, ok) {
+  ['login','forgot','reset'].forEach(p => document.getElementById(p + '-form').hidden = p !== which);
+  const h = document.querySelector('.auth-box h2');
+  h.textContent = which === 'forgot' ? 'Forgot your password?' : which === 'reset' ? 'Choose a new password' : 'Sign in to your account';
+  const err = document.getElementById('auth-error');
+  err.className = ok ? 'auth-ok' : 'auth-error';
+  err.textContent = msg || ''; err.style.display = msg ? 'block' : 'none';
+  const first = { login: 'inp-username', forgot: 'inp-forgot', reset: 'inp-reset1' }[which];
+  setTimeout(() => document.getElementById(first).focus(), 30);
+}
+async function doForgot(e) {
+  e.preventDefault();
+  const btn = document.getElementById('forgot-btn'); btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    const r = await POST('/api/auth/forgot', { login: document.getElementById('inp-forgot').value });
+    showAuthPanel('login', r.message, true);
+  } catch (ex) { showAuthPanel('forgot', ex.message); }
+  finally { btn.disabled = false; btn.textContent = 'Email me a reset link'; }
+}
+async function openResetFromLink(token) {
+  _resetToken = token;
+  history.replaceState(null, '', location.pathname);            // keep the link out of the address bar
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+  try {
+    const who = await GET('/api/auth/reset/' + encodeURIComponent(token));
+    document.getElementById('reset-who').innerHTML = `Account: <strong>${escH(who.name)}</strong> (${escH(who.username)})`;
+    showAuthPanel('reset');
+  } catch (ex) { showAuthPanel('forgot', ex.message); }
+}
+async function doReset(e) {
+  e.preventDefault();
+  const a = document.getElementById('inp-reset1').value, b = document.getElementById('inp-reset2').value;
+  if (a.length < 6) { showAuthPanel('reset', 'New password must be at least 6 characters'); return; }
+  if (a !== b)      { showAuthPanel('reset', 'The two passwords do not match'); return; }
+  const btn = document.getElementById('reset-btn'); btn.disabled = true;
+  try {
+    const r = await POST('/api/auth/reset', { token: _resetToken, password: a });
+    _resetToken = '';
+    document.getElementById('inp-username').value = r.username;
+    document.getElementById('inp-password').value = '';
+    showAuthPanel('login', 'Password changed. Sign in with your new password.', true);
+  } catch (ex) { showAuthPanel('reset', ex.message); }
+  finally { btn.disabled = false; }
+}
+
 function doLogout() {
   _token = ''; _currentUser = null;
   localStorage.removeItem('cr_token');
   localStorage.removeItem('cr_user');
+  document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
   document.getElementById('app').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'flex';
+  showAuthPanel('login');
+  document.getElementById('inp-password').value = '';
 }
 
 async function bootApp() {
@@ -783,13 +933,29 @@ new MutationObserver(() => {
 // ═══════════════════════════════════════════════════════════════════
 function ghc(n) { return 'GH₵ ' + parseFloat(n||0).toLocaleString('en-GH', {minimumFractionDigits:2, maximumFractionDigits:2}); }
 function fmtDate(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}); }
-const PERIOD_LABEL = '8:00 AM – 5:00 PM';
+// Pickup time is chosen per rental; return is by 7:00 PM. Older rentals keep the times they were made with.
+const RETURN_TIME = '19:00';
+const PICKUP_TIMES = [];
+for (let m = 6 * 60; m < 19 * 60; m += 30) PICKUP_TIMES.push(String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'));
+function fmtTime(t) {
+  const m = /^\s*(\d{1,2}):(\d{2})\s*$/.exec(t || '');
+  if (!m) return t || '';
+  const h = +m[1]; return `${h % 12 || 12}:${m[2]} ${h < 12 ? 'AM' : 'PM'}`;
+}
+const pickupOf = r => r.pickup_time || '08:00', returnOf = r => r.return_time || RETURN_TIME;
+function sameDayHours(r) {
+  const toMin = t => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? +m[1] * 60 + +m[2] : null; };
+  const a = toMin(pickupOf(r)), b = toMin(returnOf(r));
+  if (a == null || b == null || b <= a) return '';
+  const mins = b - a, h = Math.floor(mins / 60), mm = mins % 60;
+  return `${h} hour${h === 1 ? '' : 's'}${mm ? ' ' + mm + ' min' : ''}`;
+}
 function periodText(r) {
   return (!r.end_date || r.start_date === r.end_date)
-    ? `${fmtDate(r.start_date)}, ${PERIOD_LABEL}`
-    : `${fmtDate(r.start_date)} 8:00 AM – ${fmtDate(r.end_date)} 5:00 PM`;
+    ? `${fmtDate(r.start_date)}, ${fmtTime(pickupOf(r))} – ${fmtTime(returnOf(r))}`
+    : `${fmtDate(r.start_date)} ${fmtTime(pickupOf(r))} – ${fmtDate(r.end_date)} ${fmtTime(returnOf(r))}`;
 }
-// 8am–5pm days from rental date to return date, inclusive (same day = 1)
+// Days from rental date to return date, inclusive (same day = 1)
 function rentalDays(s, e) { if (!s || !e || e <= s) return 1; return Math.round((Date.parse(e) - Date.parse(s)) / 86400000) + 1; }
 const ROLE_LABEL = { superadmin:'Super Admin', admin:'Admin', staff:'Staff' };
 function isAdmin() { return !!_currentUser && (_currentUser.role === 'admin' || _currentUser.role === 'superadmin'); }
@@ -825,6 +991,10 @@ async function shrinkImage(file, maxSide = 900, quality = 0.82) {
 }
 function openMyPassword() {
   ['current','new','new2'].forEach(f => document.getElementById('mypw-'+f).value = '');
+  document.getElementById('my-email').value = (_currentUser && _currentUser.email) || '';
+  document.getElementById('my-email-note').textContent = isSuperAdmin()
+    ? 'Your daily summary is also sent here (unless Settings → Email lists other addresses).'
+    : 'If you forget your password, the reset link is sent to this address.';
   closeSidebar(); openModal('modal-mypw');
 }
 async function saveMyPassword() {
@@ -836,6 +1006,14 @@ async function saveMyPassword() {
   try {
     await POST('/api/auth/change-password', { current, password: pw });
     closeModal('modal-mypw'); toast('Password changed');
+  } catch (err) { toast(err.message, 'error'); }
+}
+async function saveMyEmail() {
+  const v = document.getElementById('my-email').value.trim();
+  try {
+    const r = await PUT('/api/auth/my-email', { email: v });
+    _currentUser.email = r.email; localStorage.setItem('cr_user', JSON.stringify(_currentUser));
+    toast(r.email ? 'Email saved' : 'Email removed');
   } catch (err) { toast(err.message, 'error'); }
 }
 function today() { return new Date().toISOString().slice(0,10); }
@@ -861,18 +1039,18 @@ function statusBadge(s) {
 // ═══════════════════════════════════════════════════════════════════
 async function renderDashboard() {
   try {
-    const stats = await GET('/api/reports/dashboard');
-    const recentRentals = await GET('/api/rentals?status=active');
-    const bookings = await GET('/api/rentals?status=booked');
+    const [stats, active, overdue, bookings] = await Promise.all([GET('/api/reports/dashboard'),
+      GET('/api/rentals?status=active'), GET('/api/rentals?status=overdue'), GET('/api/rentals?status=booked')]);
+    const recentRentals = [...overdue, ...active];          // overdue first — they need chasing
     const t = today(), soon = new Date(Date.now() + 7*86400000).toISOString().slice(0,10);
     const upcoming = bookings.filter(r => r.end_date >= t && r.start_date <= soon);
     const pickupRows = upcoming.map(r => {
       const due = r.start_date <= t;
       return `<tr>
         <td>#R-${String(r.id).padStart(4,'0')}</td>
-        <td>${r.client_name||'—'}</td>
-        <td>${(r.equipment||[]).map(e => e.qty>1 ? e.qty+' × '+e.name : e.name).join(', ')}</td>
-        <td>${due ? '<strong class="text-accent">Today</strong>' : fmtDate(r.start_date)}</td>
+        <td>${escH(r.client_name||'—')}</td>
+        <td>${escH((r.equipment||[]).map(e => e.qty>1 ? e.qty+' × '+e.name : e.name).join(', '))}</td>
+        <td>${due ? '<strong class="text-accent">Today</strong>' : fmtDate(r.start_date)}, ${fmtTime(pickupOf(r))}</td>
         <td><div class="flex gap-2">
           <button class="btn-icon btn-sm" title="Booking" onclick="showInvoice(${r.id})">📄</button>
           ${due ? `<button class="btn btn-primary btn-sm" onclick="pickupRental(${r.id})">🤝 Picked up</button>` : ''}
@@ -880,10 +1058,10 @@ async function renderDashboard() {
       </tr>`; }).join('');
 
     let recent = '';
-    recentRentals.slice(0,5).forEach(r => {
+    recentRentals.slice(0,8).forEach(r => {
       recent += `<tr>
         <td>#R-${String(r.id).padStart(4,'0')}</td>
-        <td>${r.client_name||'—'}</td>
+        <td>${escH(r.client_name||'—')}</td>
         <td>${periodText(r)}</td>
         <td>${statusBadge(r.status)}</td>
         <td>${ghc(r.subtotal)}</td>
@@ -892,22 +1070,26 @@ async function renderDashboard() {
     });
 
     document.getElementById('page-content').innerHTML = `
-      <h1 class="page-title">Welcome back, ${_currentUser.name.split(' ')[0]} 👋</h1>
+      <h1 class="page-title">Welcome back, ${escH(_currentUser.name.split(' ')[0])} 👋</h1>
+      ${isSuperAdmin() && +stats.delete_requests ? `<div class="del-banner">🕓 <strong>${stats.delete_requests} rental${+stats.delete_requests===1?'':'s'} waiting for your approval to be deleted.</strong>
+        <button class="btn btn-sm btn-secondary" onclick="showRentals('delreq')">Review</button></div>` : ''}
+      ${isSuperAdmin() && +stats.change_requests ? `<div class="del-banner chg">✏️ <strong>${stats.change_requests} booking change${+stats.change_requests===1?'':'s'} waiting for your approval.</strong>
+        <button class="btn btn-sm btn-secondary" onclick="showRentals('chgreq')">Review</button></div>` : ''}
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Active Rentals</div><div class="stat-value text-accent">${stats.active_rentals}</div></div>
-        <div class="stat-card"><div class="stat-label">Overdue</div><div class="stat-value text-red">${stats.overdue_rentals}</div></div>
+        <div class="stat-card" style="cursor:pointer" onclick="showRentals('overdue')"><div class="stat-label">Overdue</div><div class="stat-value text-red">${stats.overdue_rentals}</div><div class="stat-sub">tap to see them</div></div>
         <div class="stat-card"><div class="stat-label">Pickups Today</div><div class="stat-value" style="color:#c4b5fd">${stats.pickups_today||0}</div><div class="stat-sub">bookings to hand over</div></div>
-        <div class="stat-card"><div class="stat-label">Booked Ahead</div><div class="stat-value" style="color:#c4b5fd">${stats.booked_rentals||0}</div></div>
+        <div class="stat-card" style="cursor:pointer" onclick="showRentals('booked')"><div class="stat-label">Booked Ahead</div><div class="stat-value" style="color:#c4b5fd">${stats.booked_rentals||0}</div>${+stats.missed_bookings ? `<div class="stat-sub" style="color:#fbbf24">${stats.missed_bookings} never picked up</div>` : ''}</div>
         <div class="stat-card"><div class="stat-label">Total Clients</div><div class="stat-value">${stats.total_clients}</div></div>
         <div class="stat-card"><div class="stat-label">Equipment Items</div><div class="stat-value">${stats.total_equipment}</div></div>
-        ${isAdmin() ? `<div class="stat-card"><div class="stat-label">This Month Revenue</div><div class="stat-value text-green">${ghc(stats.month_revenue)}</div><div class="stat-sub">collected</div></div>
+        ${isAdmin() ? `<div class="stat-card"><div class="stat-label">This Month Revenue</div><div class="stat-value text-green">${ghc(stats.month_revenue)}</div><div class="stat-sub">collected (excl. cancelled)</div></div>
         <div class="stat-card"><div class="stat-label">This Month Expenses</div><div class="stat-value text-red">${ghc(stats.month_expenses)}</div><div class="stat-sub"><a href="#" onclick="navigate('expenses');return false" style="color:inherit">view expenses</a></div></div>
         <div class="stat-card"><div class="stat-label">Outstanding</div><div class="stat-value text-red">${ghc(stats.outstanding)}</div><div class="stat-sub">unpaid balance</div></div>` : ''}
       </div>
       <div class="card" style="margin-bottom:20px">
         <div class="card-header">
           <span class="card-title">📅 Upcoming Pickups — next 7 days</span>
-          <button class="btn btn-secondary btn-sm" onclick="navigate('rentals'); setTimeout(()=>{ const f=document.getElementById('rnt-filter'); if(f){ f.value='booked'; filterRentalsByStatus('booked'); } }, 700)">All bookings</button>
+          <button class="btn btn-secondary btn-sm" onclick="showRentals('booked')">All bookings</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -918,13 +1100,13 @@ async function renderDashboard() {
       </div>
       <div class="card">
         <div class="card-header">
-          <span class="card-title">Recent Active Rentals</span>
-          <button class="btn btn-primary btn-sm" onclick="navigate('rentals')">View All</button>
+          <span class="card-title">Out Now — overdue first</span>
+          <button class="btn btn-primary btn-sm" onclick="showRentals('')">View All</button>
         </div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>ID</th><th>Client</th><th>Dates</th><th>Status</th><th>Amount</th><th></th></tr></thead>
-            <tbody>${recent || '<tr><td colspan="6" class="empty">No active rentals</td></tr>'}</tbody>
+            <tbody>${recent || '<tr><td colspan="6" class="empty">Nothing out right now</td></tr>'}</tbody>
           </table>
         </div>
       </div>`;
@@ -987,15 +1169,84 @@ function clientActions(c) {
   </div>`;
 }
 // Staff: create rentals, record payments, view/print/share invoices. Admins: also mark returned & delete.
+const _rentalIndex = {};
 function rentalActions(r) {
-  return `<div class="flex gap-2">
+  _rentalIndex[r.id] = r;
+  const mine = _currentUser && r.delete_requested_by === _currentUser.id;
+  const del = !isAdmin() ? ''
+    : isSuperAdmin()
+      ? (r.delete_requested_at
+          ? `<button class="btn btn-sm btn-danger" title="Approve: delete permanently" onclick="deleteRental(${r.id})">✔ Approve delete</button>
+             <button class="btn btn-sm btn-secondary" title="Reject the delete request" onclick="rejectDelete(${r.id})">✖ Reject</button>`
+          : `<button class="btn-icon btn-sm" title="Delete permanently" onclick="deleteRental(${r.id})">🗑️</button>`)
+      : (r.delete_requested_at
+          ? (mine ? `<button class="btn btn-sm btn-secondary" title="Withdraw your delete request" onclick="rejectDelete(${r.id})">↩ Withdraw request</button>` : '')
+          : `<button class="btn-icon btn-sm" title="Ask the Super Admin to delete" onclick="requestDelete(${r.id})">🗑️</button>`);
+  const mineChange = r.change_id && _currentUser && r.change_by === _currentUser.id;
+  const edit = r.status !== 'booked' ? ''
+    : isSuperAdmin()
+      ? (r.change_id ? `<button class="btn btn-sm btn-primary" title="Review the requested change" onclick="reviewChange(${r.id})">✏️ Review change</button>` : '')
+        + `<button class="btn-icon btn-sm" title="Edit booking" onclick="editBooking(${r.id})">✏️</button>`
+      : r.change_id
+        ? (mineChange ? `<button class="btn btn-sm btn-secondary" title="Withdraw your change request" onclick="withdrawChange(${r.id})">↩ Withdraw change</button>` : '')
+        : `<button class="btn-icon btn-sm" title="Edit booking (Super Admin approves)" onclick="editBooking(${r.id})">✏️</button>`;
+  return `<div class="flex gap-2" style="flex-wrap:wrap">
     <button class="btn-icon btn-sm" title="Invoice" onclick="showInvoice(${r.id})">📄</button>
-    <button class="btn-icon btn-sm" title="Record payment" onclick="openPaymentModal(${r.id},'${(r.client_name||'').replace(/'/g,"\\'")}',${(+r.subtotal)+(+r.deposit_amt)},${r.total_paid})">💰</button>
+    ${edit}
+    ${r.status !== 'cancelled' ? `<button class="btn-icon btn-sm" title="Record payment" onclick="openPaymentFor(${r.id})">💰</button>` : ''}
     ${r.status==='booked' ? `<button class="btn btn-primary btn-sm" title="Picked up" onclick="pickupRental(${r.id})">🤝 Picked up</button>` : ''}
     ${isAdmin() && r.status==='booked' ? `<button class="btn-icon btn-sm" title="Cancel booking" onclick="cancelBooking(${r.id})">✖️</button>` : ''}
     ${isAdmin() && (r.status==='active'||r.status==='overdue') ? `<button class="btn-icon btn-sm" title="Mark Returned" onclick="markReturned(${r.id})">✅</button>` : ''}
-    ${isAdmin() ? `<button class="btn-icon btn-sm" title="Delete" onclick="deleteRental(${r.id})">🗑️</button>` : ''}
+    ${del}
   </div>`;
+}
+// ── Booking edits ───────────────────────────────────────────────────
+async function editBooking(id) {
+  let r = _rentalIndex[id];
+  try { r = await GET('/api/rentals/' + id); } catch {}
+  if (!r || r.status !== 'booked') { toast('Only bookings that have not been picked up can be edited', 'error'); return; }
+  openRentalModal(r);
+}
+async function withdrawChange(id) {
+  if (!confirm(`Withdraw your change request for ${rRef(id)}? The booking stays as it is.`)) return;
+  try { await POST(`/api/rentals/${id}/change/reject`, {}); toast('Change request withdrawn'); refreshAfterRentalChange(); }
+  catch (err) { toast(err.message, 'error'); }
+}
+let _chgRental = null;
+async function reviewChange(id) {
+  _chgRental = id;
+  let ch;
+  try { ch = await GET(`/api/rentals/${id}/change`); } catch (err) { toast(err.message, 'error'); return; }
+  if (!ch) { toast('That change was already dealt with', 'error'); refreshAfterRentalChange(); return; }
+  document.getElementById('chg-title').textContent = `Change to booking ${rRef(id)}`;
+  const rows = (ch.changes || []).map(c => `<tr><td data-label="What"><strong>${escH(c.field)}</strong></td>
+      <td data-label="Now" class="text-dim">${escH(c.from)}</td><td data-label="Change to" style="color:#86efac">${escH(c.to)}</td></tr>`).join('');
+  document.getElementById('chg-body').innerHTML = `
+    <p style="margin:0 0 6px">Asked by <strong>${escH(ch.requested_by_name)}</strong> · ${fmtDateTime(ch.requested_at)}</p>
+    <p style="margin:0 0 14px">Reason: <em>${escH(ch.reason || '—')}</em></p>
+    ${ch.problem ? `<div class="del-banner" style="border-color:#b91c1c;background:rgba(239,68,68,.1)">⚠ This change no longer fits: ${escH(ch.problem)}. You can reject it, or edit the booking yourself.</div>` : ''}
+    <div class="table-wrap"><table><thead><tr><th>What</th><th>Now</th><th>Change to</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="form-group" style="margin-top:12px"><label>Note to ${escH(ch.requested_by_name)} <span class="text-dim">(optional, for rejecting)</span></label><input id="chg-note"></div>`;
+  document.getElementById('chg-footer').innerHTML = `
+    <button class="btn btn-secondary" onclick="closeModal('modal-change')">Close</button>
+    <button class="btn btn-danger" onclick="decideChange(false)">✖ Reject</button>
+    <button class="btn btn-primary" onclick="decideChange(true)" ${ch.problem ? 'disabled title="No longer fits — reject or edit it yourself"' : ''}>✔ Approve change</button>`;
+  openModal('modal-change');
+}
+async function decideChange(approve) {
+  const id = _chgRental;
+  try {
+    if (approve) await POST(`/api/rentals/${id}/change/approve`, {});
+    else await POST(`/api/rentals/${id}/change/reject`, { note: document.getElementById('chg-note').value.trim() });
+    closeModal('modal-change');
+    toast(approve ? `Change approved — ${rRef(id)} updated` : 'Change rejected — the booking stays as it was');
+    refreshAfterRentalChange();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+function openPaymentFor(id) {
+  const r = _rentalIndex[id]; if (!r) return;
+  openPaymentModal(r.id, r.client_name || '', (+r.subtotal) + (+r.deposit_amt), +r.total_paid);
 }
 function filterClients(q) {
   q = q.toLowerCase();
@@ -1109,7 +1360,7 @@ async function renderEquipment() {
       <div class="result-note" id="eq-note"></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Name</th><th>Serial</th><th>Category</th><th>Rate/day (8am–5pm)</th><th>Deposit</th><th>Available</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Serial</th><th>Category</th><th>Rate/day</th><th>Deposit</th><th>Available</th><th></th></tr></thead>
           <tbody id="eq-tbody"></tbody>
         </table>
       </div>`;
@@ -1231,78 +1482,96 @@ async function deleteEq(id, name) {
 // ═══════════════════════════════════════════════════════════════════
 //  Rentals
 // ═══════════════════════════════════════════════════════════════════
+let _allRentals = [], _rntFilter = '', _rntSearch = '';
+function rentalRow(r) {
+  const items = (r.equipment||[]).map(e => e.qty > 1 ? `${e.qty} × ${e.name}` : e.name).join(', ');
+  const pending = r.delete_requested_at
+    ? `<div class="del-req" title="${escH('Reason: ' + (r.delete_reason || ''))}">🕓 Delete requested by ${escH(r.delete_requested_by_name || 'an admin')}<br><span>${escH(r.delete_reason || '')}</span></div>` : '';
+  return `<tr${r.delete_requested_at ? ' class="row-del-req"' : ''}>
+    <td data-label="ID">#R-${String(r.id).padStart(4,'0')}</td>
+    <td data-label="Client">${escH(r.client_name||'—')}</td>
+    <td data-label="Equipment">${escH(items||'—')}</td>
+    <td data-label="Dates">${periodText(r)}</td>
+    <td data-label="Status">${statusBadge(r.status)}${r.change_id ? `<div class="chg-req">✏️ Change waiting for approval — ${escH(r.change_by_name || '')}<br><span>${escH(r.change_summary || '')}</span></div>` : ''}${r.status === 'booked' && r.end_date < today() ? '<div class="del-req">⚠ Never picked up — cancel it to free the record</div>' : ''}${pending}</td>
+    <td data-label="Total">${ghc(r.subtotal)}</td>
+    <td data-label="Paid">${ghc(r.total_paid)}</td>
+    <td data-label="">${rentalActions(r)}</td>
+  </tr>`;
+}
+function drawRentalRows() {
+  const q = _rntSearch.trim().toLowerCase();
+  const list = _allRentals.filter(r =>
+    (!_rntFilter || (_rntFilter === 'delreq' ? !!r.delete_requested_at : _rntFilter === 'chgreq' ? !!r.change_id : r.status === _rntFilter)) &&
+    (!q || ('#r-' + String(r.id).padStart(4,'0')).includes(q) || String(r.id) === q.replace(/^#?r-?0*/, '') ||
+           (r.client_name||'').toLowerCase().includes(q) || (r.equipment||[]).some(e => (e.name||'').toLowerCase().includes(q))));
+  const tb = document.getElementById('rentals-tbody'); if (!tb) return;
+  tb.innerHTML = list.map(rentalRow).join('') || `<tr><td colspan="8" class="empty">${_allRentals.length ? 'No rentals match' : 'No rentals yet'}</td></tr>`;
+}
+function filterRentalsByStatus(status) { _rntFilter = status; drawRentalRows(); }
+function showRentals(status) { _rntFilter = status || ''; _rntSearch = ''; navigate('rentals'); }
+
 async function renderRentals() {
   const action = document.getElementById('topbar-action');
   action.textContent = '+ New Rental'; action.style.display = 'flex';
   action.onclick = () => openRentalModal();
-
   try {
     const rentals = await GET('/api/rentals');
-    let rows = '';
-    rentals.forEach(r => {
-      const items = (r.equipment||[]).map(e=>e.name).join(', ');
-      rows += `<tr>
-        <td>#R-${String(r.id).padStart(4,'0')}</td>
-        <td>${r.client_name||'—'}</td>
-        <td>${items||'—'}</td>
-        <td>${periodText(r)}</td>
-        <td>${statusBadge(r.status)}</td>
-        <td>${ghc(r.subtotal)}</td>
-        <td>${ghc(r.total_paid)}</td>
-        <td>${rentalActions(r)}</td>
-      </tr>`;
-    });
-
+    _allRentals = rentals;
+    const waiting = rentals.filter(r => r.delete_requested_at).length;
+    const changes = rentals.filter(r => r.change_id).length;
+    if (_rntFilter === 'delreq' && !waiting) _rntFilter = '';
+    if (_rntFilter === 'chgreq' && !changes) _rntFilter = '';
     document.getElementById('page-content').innerHTML = `
       <h1 class="page-title">Rentals</h1>
+      ${waiting && isSuperAdmin() ? `<div class="del-banner">🕓 <strong>${waiting} rental${waiting===1?'':'s'} waiting for your approval to be deleted.</strong>
+          <button class="btn btn-sm btn-secondary" onclick="document.getElementById('rnt-filter').value='delreq';filterRentalsByStatus('delreq')">Show ${waiting===1?'it':'them'}</button></div>` : ''}
+      ${changes && isSuperAdmin() ? `<div class="del-banner chg">✏️ <strong>${changes} booking change${changes===1?'':'s'} waiting for your approval.</strong>
+          <button class="btn btn-sm btn-secondary" onclick="document.getElementById('rnt-filter').value='chgreq';filterRentalsByStatus('chgreq')">Show ${changes===1?'it':'them'}</button></div>` : ''}
       <div class="toolbar">
-        <select id="rnt-filter" onchange="filterRentalsByStatus(this.value)" style="width:160px">
+        <input id="rnt-search" type="search" placeholder="Search client, item or #R-0001" value="${escH(_rntSearch)}" oninput="_rntSearch=this.value;drawRentalRows()" style="flex:1;min-width:180px">
+        <select id="rnt-filter" onchange="filterRentalsByStatus(this.value)" style="width:180px">
           <option value="">All statuses</option>
           <option value="booked">Booked (upcoming)</option>
           <option value="active">Active</option>
           <option value="returned">Returned</option>
           <option value="overdue">Overdue</option>
           <option value="cancelled">Cancelled</option>
+          ${waiting ? `<option value="delreq">🕓 Delete requested (${waiting})</option>` : ''}
+          ${changes ? `<option value="chgreq">✏️ Change requested (${changes})</option>` : ''}
         </select>
       </div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>ID</th><th>Client</th><th>Equipment</th><th>Dates</th><th>Status</th><th>Total</th><th>Paid</th><th></th></tr></thead>
-          <tbody id="rentals-tbody">${rows || '<tr><td colspan="8" class="empty">No rentals yet</td></tr>'}</tbody>
+          <tbody id="rentals-tbody"></tbody>
         </table>
       </div>`;
-    _allRentals = rentals;
-  } catch (err) { document.getElementById('page-content').innerHTML = `<div class="empty text-red">${err.message}</div>`; }
-}
-
-let _allRentals = [];
-function filterRentalsByStatus(status) {
-  const filtered = status ? _allRentals.filter(r=>r.status===status) : _allRentals;
-  document.getElementById('rentals-tbody').innerHTML = filtered.map(r => {
-    const items = (r.equipment||[]).map(e=>e.name).join(', ');
-    return `<tr>
-      <td>#R-${String(r.id).padStart(4,'0')}</td>
-      <td>${r.client_name||'—'}</td>
-      <td>${items||'—'}</td>
-      <td>${periodText(r)}</td>
-      <td>${statusBadge(r.status)}</td>
-      <td>${ghc(r.subtotal)}</td>
-      <td>${ghc(r.total_paid)}</td>
-      <td>${rentalActions(r)}</td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="8" class="empty">No rentals</td></tr>';
+    document.getElementById('rnt-filter').value = _rntFilter;
+    drawRentalRows();
+  } catch (err) { document.getElementById('page-content').innerHTML = `<div class="empty text-red">${escH(err.message)}</div>`; }
 }
 
 // Rental modal
 let _eqRows = [];
-async function openRentalModal() {
+let _rntReqId = null, _rntEdit = null;
+// openRentalModal()            → new rental / booking
+// openRentalModal(bookingRow)  → edit a booking (needs Super Admin approval unless you are the Super Admin)
+async function openRentalModal(edit = null) {
+  _rntReqId = newReqId();
+  _rntEdit = edit;
   _eqRows = [];
   document.getElementById('rnt-eq-list').innerHTML = '';
   document.getElementById('rnt-total-row').textContent = '';
-  document.getElementById('rnt-notes').value = '';
+  document.getElementById('rnt-notes').value = edit ? (edit.notes || '') : '';
+  document.getElementById('rnt-reason').value = '';
+  document.getElementById('rnt-reason-group').hidden = !edit || isSuperAdmin();
+  document.getElementById('rnt-title').textContent = edit ? `Edit Booking ${rRef(edit.id)}` : 'New Rental';
   _discRules = await GET('/api/rentals/discount-rules').catch(() => _discRules);
-  document.getElementById('rnt-start').value = today();
-  document.getElementById('rnt-end').value   = today();
+  document.getElementById('rnt-start').value = edit ? edit.start_date : today();
+  document.getElementById('rnt-end').value   = edit ? edit.end_date : today();
+  const pt = edit ? (edit.pickup_time || '08:00') : '08:00';
+  document.getElementById('rnt-pickup').innerHTML = PICKUP_TIMES.map(t => `<option value="${t}"${t === pt ? ' selected' : ''}>${fmtTime(t)}</option>`).join('');
+  document.getElementById('rnt-start').min   = edit ? today() : '';
   document.getElementById('rnt-end').min     = today();
 
   // Populate client dropdown
@@ -1316,8 +1585,14 @@ async function openRentalModal() {
 
   // Always use fresh stock figures, then work out what's free on the chosen dates
   _allEquipment = await GET('/api/equipment');
+  if (edit) sel.value = edit.client_id;
   await refreshAvailability(false);
-  addEquipmentRow();
+  if (edit) {
+    const gone = [];
+    (edit.equipment || []).forEach(it => _allEquipment.some(e => e.id === it.equipment_id) ? addEquipmentRow(it) : gone.push(it.name));
+    if (gone.length) toast(`No longer in the equipment list: ${gone.join(', ')} — choose a replacement`, 'error');
+    if (!document.querySelector('#rnt-eq-list > .eq-pick')) addEquipmentRow();
+  } else addEquipmentRow();
   openModal('modal-rental');
 }
 
@@ -1330,13 +1605,20 @@ async function refreshAvailability(redraw = true) {
   if (!endEl.value || endEl.value < from) endEl.value = from;
   const seq = ++_availSeq;
   try {
-    const r = await GET(`/api/rentals/availability?from=${from}&to=${endEl.value}`);
+    const r = await GET(`/api/rentals/availability?from=${from}&to=${endEl.value}${_rntEdit ? '&exclude=' + _rntEdit.id : ''}`);
     if (seq !== _availSeq) return;          // a newer date change is already loading
     _avail = r.items; _availToday = r.today;
   } catch { _avail = null; }
   const note = document.getElementById('rnt-booking-note');
-  document.querySelector('#modal-rental .modal-footer .btn-primary').textContent = from > _availToday ? 'Create Booking' : 'Create Rental';
-  if (from > _availToday) {
+  document.getElementById('rnt-save').textContent = _rntEdit ? (isSuperAdmin() ? 'Save changes' : 'Send for approval')
+                                                 : from > _availToday ? 'Create Booking' : 'Create Rental';
+  if (_rntEdit) {
+    note.style.display = '';
+    note.innerHTML = isSuperAdmin()
+      ? `✏️ Your changes apply straight away. Payments already made (${ghc(_rntEdit.total_paid)}) stay on the booking; the balance updates.`
+      : `✏️ Your change goes to the <strong>Super Admin for approval</strong>. Until then the booking stays as it is.
+         Payments already made (${ghc(_rntEdit.total_paid)}) stay on the booking.`;
+  } else if (from > _availToday) {
     note.style.display = '';
     note.innerHTML = `📅 This will be saved as a <strong>booking</strong> for ${fmtDate(from)}. The equipment is reserved for these dates and is
       only taken out of stock when the client collects it — tap <strong>🤝 Picked up</strong> on that day.`;
@@ -1361,7 +1643,16 @@ function eqOptions(cat) {
   }).join('') || '<option value="" disabled>No items in this category</option>';
 }
 
-function addEquipmentRow() {
+// Rate used for a row: an item already on the booking keeps the price it was booked at
+function rowRates(row) {
+  const sel = row.querySelector('.eq-item'), opt = sel.selectedOptions[0];
+  if (!opt || !opt.value) return null;
+  if (row.dataset.keepId && row.dataset.keepId === sel.value)
+    return { price: +row.dataset.keepPrice || 0, deposit: +row.dataset.keepDeposit || 0 };
+  return { price: parseFloat(opt.dataset.price) || 0, deposit: parseFloat(opt.dataset.deposit) || 0 };
+}
+
+function addEquipmentRow(pre) {
   const id = Date.now() + Math.floor(Math.random()*1000);
   _eqRows.push(id);
   const cats = [...new Set(_allEquipment.map(e => e.category))].sort();
@@ -1378,8 +1669,17 @@ function addEquipmentRow() {
     <button class="btn-icon" title="Remove" onclick="removeEqRow('${id}')">✕</button>`;
   document.getElementById('rnt-eq-list').appendChild(div);
   const item = div.querySelector('.eq-item');
-  const firstFree = [...item.options].find(o => !o.disabled);
-  if (firstFree) item.value = firstFree.value;
+  if (pre) {
+    const eq = _allEquipment.find(e => e.id === pre.equipment_id);
+    if (eq) { div.querySelector('.eq-cat').value = eq.category; item.innerHTML = eqOptions(eq.category); }
+    item.value = String(pre.equipment_id);
+    div.querySelector('.eq-qty').value = pre.qty || 1;
+    Object.assign(div.dataset, { keepId: String(pre.equipment_id), keepPrice: pre.unit_price, keepDeposit: pre.unit_deposit });
+    if (item.value !== String(pre.equipment_id)) { const f = [...item.options].find(o => !o.disabled); if (f) item.value = f.value; }
+  } else {
+    const firstFree = [...item.options].find(o => !o.disabled);
+    if (firstFree) item.value = firstFree.value;
+  }
   syncQtyMax(item);
   calcRentalTotal();
 }
@@ -1428,18 +1728,14 @@ function calcRentalTotal() {
   const days = rentalDays(start, endEl.value);
   let subtotal=0, deposit=0;
   document.querySelectorAll('#rnt-eq-list > .eq-pick').forEach(row => {
-    const sel = row.querySelector('.eq-item');
     const qty = parseInt(row.querySelector('.eq-qty').value)||1;
-    const opt = sel.selectedOptions[0];
-    if (!opt || !opt.value) return;
-    const price   = parseFloat(opt.dataset.price)||0;
-    const dep     = parseFloat(opt.dataset.deposit)||0;
-    subtotal += price * qty * days;
-    deposit  += dep * qty;
+    const rt = rowRates(row); if (!rt) return;
+    subtotal += rt.price * qty * days;
+    deposit  += rt.deposit * qty;
   });
   const d = discountFor(subtotal);
   document.getElementById('rnt-total-row').innerHTML =
-    `${days>1 ? days+' days' : 'Same day, 8:00 AM – 5:00 PM'} — Rental: ${ghc(d.gross)}` +
+    `${days>1 ? days+' days' : `Same day, ${fmtTime(document.getElementById('rnt-pickup').value || '08:00')} – ${fmtTime(RETURN_TIME)}`} — Rental: ${ghc(d.gross)}` +
     (d.amount ? ` <span class="text-green">− ${d.pct}% discount ${ghc(d.amount)}</span> = ${ghc(d.net)}` : '') +
     ` + Deposit: ${ghc(deposit)} = <span style="white-space:nowrap">${ghc(d.net+deposit)}</span>`;
 }
@@ -1448,6 +1744,7 @@ async function saveRental() {
   const client_id  = document.getElementById('rnt-client').value;
   const rental_date = document.getElementById('rnt-start').value;
   const return_date = document.getElementById('rnt-end').value || rental_date;
+  const pickup_time = document.getElementById('rnt-pickup').value || '08:00';
   if (!client_id)   { toast('Select a client','error'); return; }
   if (!rental_date) { toast('Rental date required','error'); return; }
   if (return_date < rental_date) { toast('Return date cannot be before the rental date','error'); return; }
@@ -1455,13 +1752,12 @@ async function saveRental() {
   document.querySelectorAll('#rnt-eq-list > .eq-pick').forEach(row => {
     const sel = row.querySelector('.eq-item');
     const qty = parseInt(row.querySelector('.eq-qty').value)||1;
-    const opt = sel.selectedOptions[0];
-    if (!opt || !opt.value) return;
+    const rt = rowRates(row); if (!rt) return;
     equipment.push({
       equipment_id: parseInt(sel.value),
       qty,
-      unit_price:   parseFloat(opt.dataset.price)||0,
-      unit_deposit: parseFloat(opt.dataset.deposit)||0
+      unit_price:   rt.price,
+      unit_deposit: rt.deposit
     });
   });
   if (!equipment.length) { toast('Add at least one equipment item','error'); return; }
@@ -1473,9 +1769,23 @@ async function saveRental() {
     if (eq && n > freeFor(eq)) { toast(`Only ${freeFor(eq)} × ${eq.name} free for these dates`, 'error'); return; }
   }
 
+  if (_rntEdit) {
+    const reason = document.getElementById('rnt-reason').value.trim();
+    if (!isSuperAdmin() && reason.length < 3) { toast('Give a reason for the change', 'error'); document.getElementById('rnt-reason').focus(); return; }
+    try {
+      const r = await POST(`/api/rentals/${_rntEdit.id}/change`, { reason, client_id: parseInt(client_id), rental_date, return_date,
+        pickup_time, equipment, notes: document.getElementById('rnt-notes').value });
+      closeModal('modal-rental');
+      toast(r.applied ? `Booking ${rRef(_rntEdit.id)} updated` : 'Change sent to the Super Admin for approval');
+      _allEquipment = []; _rntEdit = null;
+      refreshAfterRentalChange();
+    } catch (err) { toast(err.message, 'error'); }
+    return;
+  }
   try {
     const made = await POST('/api/rentals', {
-      client_id: parseInt(client_id), rental_date, return_date,
+      request_id: _rntReqId,
+      client_id: parseInt(client_id), rental_date, return_date, pickup_time,
       equipment,
       notes: document.getElementById('rnt-notes').value || null
     });
@@ -1515,14 +1825,31 @@ async function markReturned(id) {
   } catch (err) { toast(err.message,'error'); }
 }
 
+// Permanent delete — Super Admin only. Admins send a request with a reason.
+const rRef = id => '#R-' + String(id).padStart(4,'0');
+function refreshAfterRentalChange() { _allEquipment = []; _page === 'dashboard' ? renderDashboard() : renderRentals(); }
 async function deleteRental(id) {
-  if (!confirm('Delete rental #R-'+String(id).padStart(4,'0')+'? This cannot be undone.')) return;
-  try {
-    await DELETE('/api/rentals/'+id);
-    toast('Rental deleted');
-    _allEquipment = [];
-    renderRentals();
-  } catch (err) { toast(err.message,'error'); }
+  const r = _rentalIndex[id] || {};
+  const why = r.delete_requested_at ? `\n\nRequested by ${r.delete_requested_by_name}: "${r.delete_reason}"` : '';
+  if (!confirm(`Permanently delete rental ${rRef(id)}${r.client_name ? ' (' + r.client_name + ')' : ''}?${why}\n\nIts payments are deleted too and it disappears from all reports. This cannot be undone.\n\nTip: to stop a booking without losing the record, cancel it instead.`)) return;
+  try { await DELETE('/api/rentals/' + id); toast(`Rental ${rRef(id)} deleted`); refreshAfterRentalChange(); }
+  catch (err) { toast(err.message, 'error'); }
+}
+async function requestDelete(id) {
+  const reason = prompt(`Only the Super Admin can permanently delete a rental.\n\nWhy should ${rRef(id)} be deleted? (e.g. "Created twice by mistake")`);
+  if (reason === null) return;
+  if (reason.trim().length < 5) { toast('Please give a short reason', 'error'); return; }
+  try { await POST(`/api/rentals/${id}/delete-request`, { reason: reason.trim() }); toast('Request sent to the Super Admin'); refreshAfterRentalChange(); }
+  catch (err) { toast(err.message, 'error'); }
+}
+async function rejectDelete(id) {
+  const r = _rentalIndex[id] || {};
+  const mine = _currentUser && r.delete_requested_by === _currentUser.id;
+  let note = '';
+  if (mine) { if (!confirm(`Withdraw your request to delete ${rRef(id)}?`)) return; }
+  else { note = prompt(`Reject ${r.delete_requested_by_name || 'the'} request to delete ${rRef(id)}?\n\nOptional note (why it stays):`); if (note === null) return; }
+  try { await POST(`/api/rentals/${id}/delete-request/cancel`, { note }); toast(mine ? 'Request withdrawn' : 'Delete request rejected — the rental stays'); refreshAfterRentalChange(); }
+  catch (err) { toast(err.message, 'error'); }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1531,33 +1858,53 @@ async function deleteRental(id) {
 async function renderPaymentsPage() {
   try {
     const payments = await GET('/api/payments');
-    let rows = '';
-    payments.forEach(p => {
-      const mLabel = { cash:'Cash',momo:'Mobile Money',bank_transfer:'Bank Transfer',cheque:'Cheque',other:'Other' };
-      rows += `<tr>
-        <td>${fmtDate(p.paid_at)}</td>
-        <td>#R-${String(p.rental_id).padStart(4,'0')}</td>
-        <td>${ghc(p.amount)}</td>
-        <td>${mLabel[p.method]||p.method}</td>
-        <td>${p.reference||'—'}</td>
-        <td>${p.note||'—'}</td>
-      </tr>`;
-    });
+    const mLabel = { cash:'Cash', momo:'Mobile Money', bank_transfer:'Bank Transfer', cheque:'Cheque', other:'Other' };
+    // Likely double entries: same rental, same amount, recorded within 5 minutes of each other
+    const dup = new Set();
+    const byRental = {};
+    payments.forEach(p => (byRental[p.rental_id] = byRental[p.rental_id] || []).push(p));
+    Object.values(byRental).forEach(list => list.forEach(a => list.forEach(b => {
+      if (a.id < b.id && +a.amount === +b.amount && Math.abs(new Date(a.paid_at) - new Date(b.paid_at)) < 5 * 60000) dup.add(b.id);
+    })));
+    const counted = payments.filter(p => p.rental_status !== 'cancelled');
+    const onCancelled = payments.filter(p => p.rental_status === 'cancelled');
+    const sum = list => list.reduce((t, p) => t + +p.amount, 0);
+    const rows = payments.map(p => `<tr${dup.has(p.id) ? ' style="background:rgba(234,179,8,.08)"' : ''}>
+        <td data-label="Date">${fmtDateTime(p.paid_at)}</td>
+        <td data-label="Rental">#R-${String(p.rental_id).padStart(4,'0')}${p.rental_status === 'cancelled' ? ' ' + statusBadge('cancelled') : ''}</td>
+        <td data-label="Client">${escH(p.client_name || '—')}</td>
+        <td data-label="Amount" class="${p.rental_status === 'cancelled' ? 'text-dim' : ''}">${ghc(p.amount)}${dup.has(p.id) ? '<div style="color:#fbbf24;font-size:.75rem">⚠ Possible double entry</div>' : ''}</td>
+        <td data-label="Method">${mLabel[p.method]||p.method}</td>
+        <td data-label="Reference">${escH(p.reference||'—')}</td>
+        <td data-label="Note">${escH(p.note||'—')}</td>
+        <td data-label="">${isAdmin() ? `<button class="btn-icon btn-sm" title="Delete payment" onclick="deletePayment(${p.id})">🗑️</button>` : ''}</td>
+      </tr>`).join('');
     document.getElementById('page-content').innerHTML = `
       <h1 class="page-title">Payments</h1>
+      <div class="stat-grid" style="margin-bottom:16px">
+        <div class="stat-card"><div class="stat-label">Payments counted</div><div class="stat-value text-green">${ghc(sum(counted))}</div><div class="stat-sub">${counted.length} payment${counted.length===1?'':'s'} (latest 500)</div></div>
+        <div class="stat-card"><div class="stat-label">On cancelled bookings</div><div class="stat-value text-dim">${ghc(sum(onCancelled))}</div><div class="stat-sub">not counted as revenue</div></div>
+        ${dup.size ? `<div class="stat-card" style="border-color:#a16207"><div class="stat-label">Possible double entries</div><div class="stat-value" style="color:#fbbf24">${dup.size}</div><div class="stat-sub">highlighted below — check and delete</div></div>` : ''}
+      </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Date</th><th>Rental</th><th>Amount</th><th>Method</th><th>Reference</th><th>Note</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="6" class="empty">No payments recorded</td></tr>'}</tbody>
+          <thead><tr><th>Date</th><th>Rental</th><th>Client</th><th>Amount</th><th>Method</th><th>Reference</th><th>Note</th><th></th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="8" class="empty">No payments recorded</td></tr>'}</tbody>
         </table>
       </div>`;
-  } catch (err) { document.getElementById('page-content').innerHTML = `<div class="empty text-red">${err.message}</div>`; }
+  } catch (err) { document.getElementById('page-content').innerHTML = `<div class="empty text-red">${escH(err.message)}</div>`; }
+}
+
+async function deletePayment(id) {
+  if (!confirm('Delete this payment? The rental\'s balance will go back up by this amount. This is recorded in the Activity Log.')) return;
+  try { await DELETE('/api/payments/' + id); toast('Payment deleted'); renderPaymentsPage(); }
+  catch (err) { toast(err.message, 'error'); }
 }
 
 // ─── Payment modal ───────────────────────────────────────────────
-let _pmtRentalId = null;
+let _pmtRentalId = null, _pmtReqId = null, _pmtBalance = 0;
 function openPaymentModal(rentalId, clientName, subtotal, paid) {
-  _pmtRentalId = rentalId;
+  _pmtRentalId = rentalId; _pmtReqId = newReqId(); _pmtBalance = Math.round((subtotal - paid) * 100) / 100;
   document.getElementById('pmt-rental-label').value = `#R-${String(rentalId).padStart(4,'0')} — ${clientName} (Balance: ${ghc(subtotal-paid)})`;
   document.getElementById('pmt-amount').value  = Math.max(0, (subtotal-paid)).toFixed(2);
   document.getElementById('pmt-method').value  = 'cash';
@@ -1567,10 +1914,14 @@ function openPaymentModal(rentalId, clientName, subtotal, paid) {
 }
 
 async function savePayment() {
-  const amount = parseFloat(document.getElementById('pmt-amount').value);
+  const amount = Math.round(parseFloat(document.getElementById('pmt-amount').value) * 100) / 100;
   if (!amount || amount <= 0) { toast('Enter a valid amount','error'); return; }
+  if (_pmtBalance <= 0 && !confirm('This rental is already fully paid. Record another payment anyway?')) return;
+  if (_pmtBalance > 0 && amount > _pmtBalance + 0.001 &&
+      !confirm(`${ghc(amount)} is more than the balance of ${ghc(_pmtBalance)}. Record it anyway?`)) return;
   try {
     await POST('/api/payments', {
+      request_id: _pmtReqId,
       rental_id: _pmtRentalId,
       amount,
       method:    document.getElementById('pmt-method').value,
@@ -1578,6 +1929,7 @@ async function savePayment() {
       note:      document.getElementById('pmt-note').value || null
     });
     closeModal('modal-payment');
+    _pmtReqId = null;
     toast('Payment recorded');
     if (_page === 'rentals') renderRentals();
     else if (_page === 'payments') renderPaymentsPage();
@@ -1635,8 +1987,8 @@ async function showInvoice(id) {
         <div>
           <strong style="color:#E8520A">RENTAL PERIOD</strong><br>
           ${(!r.end_date || r.start_date === r.end_date)
-            ? `Date: ${fmtDate(r.start_date)}<br>Pickup: 8:00 AM<br>Return: 5:00 PM (same day)<br>Duration: 9 hours`
-            : `Pickup: ${fmtDate(r.start_date)}, 8:00 AM<br>Return: ${fmtDate(r.end_date)}, 5:00 PM<br>Duration: ${r.days} days`}
+            ? `Date: ${fmtDate(r.start_date)}<br>Pickup: ${fmtTime(pickupOf(r))}<br>Return: ${fmtTime(returnOf(r))} (same day)${sameDayHours(r) ? '<br>Duration: ' + sameDayHours(r) : ''}`
+            : `Pickup: ${fmtDate(r.start_date)}, ${fmtTime(pickupOf(r))}<br>Return: ${fmtDate(r.end_date)}, ${fmtTime(returnOf(r))}<br>Duration: ${r.days} days`}
         </div>
       </div>
 
@@ -1691,6 +2043,36 @@ async function showInvoice(id) {
   } catch (err) { toast(err.message,'error'); }
 }
 
+const MAIL_KIND = { invoice:'Invoice', return_reminder:'Return reminder', overdue:'Overdue notice', summary:'Daily summary',
+                    password_reset:'Password reset', test:'Test email' };
+async function openEmailInvoice() {
+  const r = _invoiceRental; if (!r) return;
+  document.getElementById('mail-title').textContent = `Email ${r.status === 'booked' ? 'booking confirmation' : 'invoice'} #R-${String(r.id).padStart(4,'0')}`;
+  const to = document.getElementById('mail-to');
+  to.value = r.client_email || '';
+  document.getElementById('mail-note').textContent = r.client_email
+    ? `${r.client_name}'s email on file.`
+    : `${r.client_name} has no email on file — type one in.${isAdmin() ? ' (You can save it on the Clients page so reminders reach them too.)' : ''}`;
+  const h = document.getElementById('mail-history'); h.innerHTML = '';
+  openModal('modal-mail'); setTimeout(() => to.focus(), 50);
+  try {
+    const sent = await GET(`/api/rentals/${r.id}/emails`);
+    if (sent.length) h.innerHTML = `<div class="text-dim" style="margin:4px 0 6px">Already sent for this rental:</div>` +
+      sent.map(m => `<div>${m.status === 'sent' ? '✅' : m.status === 'failed' ? '⚠️' : '⏳'} ${MAIL_KIND[m.kind] || m.kind} · ${fmtDateTime(m.at)}${m.error ? ` <span class="text-red">— ${escH(m.error)}</span>` : ''}</div>`).join('');
+  } catch {}
+}
+async function sendInvoiceEmail() {
+  const r = _invoiceRental, btn = document.getElementById('mail-send');
+  const to = document.getElementById('mail-to').value.trim();
+  if (!to) { toast('Type an email address', 'error'); return; }
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    const res = await POST(`/api/rentals/${r.id}/email`, { to });
+    closeModal('modal-mail'); toast('Email sent to ' + res.to);
+  } catch (err) { toast(err.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = '📧 Send email'; }
+}
+
 function shareWhatsApp() {
   if (!_invoiceRental) return;
   const r = _invoiceRental;
@@ -1704,7 +2086,7 @@ function shareWhatsApp() {
     `Adum-Kumasi, Opposite Oyerepa FM & Bosheba Building\n` +
     `Tel: 0241 334 486 | 024 816 4307\n\n` +
     `*Client:* ${r.client_name||'—'}\n` +
-    `*Period:* ${periodText(r)}${(!r.end_date||r.start_date===r.end_date)?' (9 hours)':' ('+r.days+' days)'}\n\n` +
+    `*Period:* ${periodText(r)}${(!r.end_date||r.start_date===r.end_date)?(sameDayHours(r)?' ('+sameDayHours(r)+')':''):' ('+r.days+' days)'}\n\n` +
     `*Items:*\n${items}\n\n` +
     (+r.discount_amt > 0
       ? `*Subtotal:* ${ghc(r.gross_amount)}\n*Discount (${+r.discount_pct}%):* − ${ghc(r.discount_amt)}\n*Rental after discount:* ${ghc(subtotal)}\n`
@@ -1781,7 +2163,9 @@ function markCustomRange() { document.querySelectorAll('[data-range]').forEach(c
 // Download a table as a CSV file that opens in Excel
 let _reportData = null;
 function downloadCSV(name, header, rows) {
-  const cell = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const cell = v => { let s = v == null ? '' : String(v);
+    if (/^[=+@\t\r]/.test(s) || (/^-/.test(s) && !/^-?\d/.test(s))) s = "'" + s;      // stop Excel treating text as a formula
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const csv = '﻿' + [header, ...rows].map(r => r.map(cell).join(',')).join('\r\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -1803,9 +2187,12 @@ function exportReport(which) {
   if (which === 'expenses') downloadCSV('expenses',
     ['Date','Category','Description','Amount (GHS)','Paid with','Paid to','Reference','Equipment','Recorded by'],
     (d.expenses||[]).map(x => [x.spent_on, x.category, x.description, num(x.amount), x.method, x.paid_to, x.reference, x.equipment_name, x.created_by_name]));
+  if (which === 'cancelled') downloadCSV('cancelled-bookings',
+    ['Rental', 'Client', 'Phone', 'Equipment', 'From', 'To', 'Days', 'Value (GHS)', 'Paid on it (GHS)'],
+    (d.cancelled||[]).map(r => ['#R-' + String(r.id).padStart(4,'0'), r.client_name, r.phone, r.items, r.start_date, r.end_date, r.days, num(r.subtotal), num(r.total_paid)]));
   if (which === 'rentals') downloadCSV('rentals',
     ['Rental','Client','Phone','Equipment','From','To','Days','Status','Before discount (GHS)','Discount %','Discount (GHS)','Rental (GHS)','Deposit (GHS)','Paid (GHS)','Outstanding (GHS)'],
-    d.rentals.map(r => ['#R-' + String(r.id).padStart(4,'0'), r.client_name, r.phone, r.items, r.start_date, r.end_date, r.days, r.status,
+    d.rentals.filter(r => r.status !== 'cancelled').map(r => ['#R-' + String(r.id).padStart(4,'0'), r.client_name, r.phone, r.items, r.start_date, r.end_date, r.days, r.status,
       num(r.gross_amount || r.subtotal), +r.discount_pct || 0, num(r.discount_amt), num(r.subtotal), num(r.deposit_amt), num(r.total_paid), r.status === 'cancelled' ? '0.00' : num((+r.subtotal)+(+r.deposit_amt)-(+r.total_paid))]));
 }
 
@@ -1846,7 +2233,10 @@ async function loadReport() {
         <td>${escH(x.paid_to||'—')}</td><td class="text-red">${ghc(x.amount)}</td></tr>`).join('');
     const catRows = (d.by_category||[]).map(c => `<tr><td>${escH(c.category)}</td><td>${c.count}</td><td class="text-red">${ghc(c.amount)}</td>
         <td>${+s.expenses ? Math.round(c.amount / s.expenses * 100) + '%' : '—'}</td></tr>`).join('');
-    const rentRows = d.rentals.map(r => `<tr>
+    const cancelledRows = (d.cancelled||[]).map(r => `<tr>
+        <td>#R-${String(r.id).padStart(4,'0')}</td><td>${escH(r.client_name)}</td><td>${escH(r.items||'—')}</td>
+        <td>${periodText(r)}</td><td>${ghc(r.subtotal)}</td><td>${+r.total_paid ? `<strong style="color:#fbbf24">${ghc(r.total_paid)}</strong>` : '—'}</td></tr>`).join('');
+    const rentRows = d.rentals.filter(r => r.status !== 'cancelled').map(r => `<tr>
         <td>#R-${String(r.id).padStart(4,'0')}</td><td>${r.client_name}</td><td>${r.items||'—'}</td>
         <td>${periodText(r)}</td><td>${statusBadge(r.status)}</td><td>${ghc(r.subtotal)}</td>
         <td>${r.status === 'cancelled' ? '—' : ghc((+r.subtotal)+(+r.deposit_amt)-(+r.total_paid))}</td></tr>`).join('');
@@ -1866,6 +2256,7 @@ async function loadReport() {
         <div class="stat-card" style="border-color:${+s.net_profit >= 0 ? '#166534' : '#7f1d1d'}"><div class="stat-label">Net Profit</div><div class="stat-value ${+s.net_profit >= 0 ? 'text-green' : 'text-red'}">${ghc(s.net_profit)}</div><div class="stat-sub">revenue − expenses</div></div>`}
         <div class="stat-card"><div class="stat-label">Collected</div><div class="stat-value text-green">${ghc(s.collected)}</div><div class="stat-sub">payments incl. deposits</div></div>
         <div class="stat-card"><div class="stat-label">Outstanding</div><div class="stat-value text-red">${ghc(s.outstanding)}</div><div class="stat-sub">still to be paid</div></div>
+        ${+s.cancelled_rentals ? `<div class="stat-card"><div class="stat-label">Cancelled Bookings</div><div class="stat-value text-dim">${s.cancelled_rentals}</div><div class="stat-sub">${ghc(s.cancelled_paid)} paid on them — not revenue</div></div>` : ''}
       </div>
 
       <div class="card mt-3">
@@ -1896,11 +2287,19 @@ async function loadReport() {
       </div>`}
 
       <div class="card mt-3">
-        <div class="card-header"><span class="card-title">📦 All Rentals — ${d.rentals.length}</span>${csvBtn('rentals')}</div>
+        <div class="card-header"><span class="card-title">📦 All Rentals — ${d.rentals.length - (d.cancelled||[]).length}</span>${csvBtn('rentals')}</div>
         <div class="table-wrap"><table>
           <thead><tr><th>ID</th><th>Client</th><th>Equipment</th><th>Dates</th><th>Status</th><th>Total</th><th>Outstanding</th></tr></thead>
           <tbody>${rentRows || '<tr><td colspan="7" class="empty">No rentals in this range</td></tr>'}</tbody></table></div>
-      </div>`;
+      </div>
+      ${(d.cancelled||[]).length ? `
+      <div class="card mt-3">
+        <div class="card-header"><span class="card-title">✖️ Cancelled Bookings — ${d.cancelled.length}</span>${csvBtn('cancelled')}</div>
+        <p class="text-dim" style="font-size:.85rem;margin:-4px 0 10px">Not counted in revenue, collected or outstanding. Money paid on them is shown so you can refund it or keep it as agreed.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>Client</th><th>Equipment</th><th>Dates</th><th>Value</th><th>Paid on it</th></tr></thead>
+          <tbody>${cancelledRows}</tbody></table></div>
+      </div>` : ''}`;
   } catch (err) {
     document.getElementById('report-output').innerHTML = `<div class="empty text-red">${err.message}</div>`;
   }
@@ -1995,7 +2394,7 @@ async function loadExpenses(first) {
 
 async function openExpenseModal(id) {
   const x = id ? _exp.items.find(e => e.id === id) : null;
-  _exp.editId = x ? x.id : null;
+  _exp.editId = x ? x.id : null; _exp.reqId = newReqId();
   if (!_exp.categories.length) { const d = await GET('/api/expenses?from=2999-01-01'); _exp.categories = d.categories; }
   const eq = _allEquipment.length ? _allEquipment : (_allEquipment = await GET('/api/equipment'));
   document.getElementById('exp-title').textContent = x ? 'Edit Expense' : 'Record Expense';
@@ -2029,7 +2428,7 @@ async function saveExpense() {
   if (!body.description.trim()) return toast('Say what the money was spent on', 'error');
   const btn = document.getElementById('exp-save'); btn.disabled = true;
   try {
-    if (_exp.editId) await PATCH('/api/expenses/' + _exp.editId, body); else await POST('/api/expenses', body);
+    if (_exp.editId) await PATCH('/api/expenses/' + _exp.editId, body); else await POST('/api/expenses', { ...body, request_id: _exp.reqId });
     closeModal('modal-expense');
     toast(_exp.editId ? 'Expense updated' : `Expense of ${ghc(body.amount)} recorded`);
     if (_page === 'expenses') loadExpenses();
@@ -2046,7 +2445,9 @@ async function deleteExpense(id) {
 
 function exportExpenses() {
   const val = id => document.getElementById(id).value;
-  const cell = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const cell = v => { let s = v == null ? '' : String(v);
+    if (/^[=+@\t\r]/.test(s) || (/^-/.test(s) && !/^-?\d/.test(s))) s = "'" + s;
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const rows = [['Date','Category','Description','Amount (GHS)','Paid with','Paid to','Reference','Equipment','Recorded by'],
     ..._exp.items.map(x => [x.spent_on, x.category, x.description, (+x.amount).toFixed(2), EXP_METHOD[x.method] || x.method, x.paid_to, x.reference, x.equipment_name, x.created_by_name])];
   const a = document.createElement('a');
@@ -2071,7 +2472,8 @@ const ACT_ICON = { login:'🔓', login_failed:'⛔', password_change:'🔑', eme
   rental_create:'📦', booking_create:'📅', rental_pickup:'🤝', rental_return:'✅', booking_cancel:'✖️', rental_delete:'🗑️',
   payment_create:'💰', payment_delete:'🗑️', client_create:'👤', client_update:'✏️', client_delete:'🗑️',
   equipment_create:'🎬', equipment_update:'✏️', equipment_photo:'📷', equipment_delete:'🗑️',
-  expense_create:'🧾', expense_update:'✏️', expense_delete:'🗑️', settings_update:'⚙️', user_create:'🧑‍💼', user_update:'🛠️', user_delete:'🗑️', data_clear:'⚠️', data_import:'⬆️' };
+  expense_create:'🧾', expense_update:'✏️', expense_delete:'🗑️', settings_update:'⚙️', user_create:'🧑‍💼', user_update:'🛠️', user_delete:'🗑️', data_clear:'⚠️', data_import:'⬆️',
+  invoice_email:'📧', email_test:'📧', email_summary:'📊', password_reset_request:'✉️', password_reset:'🔑' };
 const ACT_WARN = ['login_failed','rental_delete','payment_delete','expense_delete','client_delete','equipment_delete','user_delete','data_clear','emergency_reset'];
 let _act = { items: [], more: false, filters: {} };
 
@@ -2102,6 +2504,7 @@ async function renderActivity() {
             <option value="expenses">Expenses</option>
             <option value="users">User accounts</option>
             <option value="signins">Sign-ins & passwords</option>
+            <option value="emails">📧 Emails sent</option>
             <option value="failed">⛔ Failed sign-ins only</option>
             <option value="deletes">🗑️ Deletions & cancellations</option>
             <option value="system">Super Admin actions</option>
@@ -2203,7 +2606,7 @@ async function renderUsers() {
       const self = u.id === _currentUser.id;
       rows += `<tr>
         <td>${u.name}${self?' <span class="text-dim" style="font-size:.75rem">(you)</span>':''}</td>
-        <td>${u.username}</td>
+        <td>${u.username}${u.email ? `<div class="text-dim" style="font-size:.75rem">${escH(u.email)}</div>` : ''}</td>
         <td><span class="badge badge-${u.role}">${ROLE_LABEL[u.role]||u.role}</span></td>
         <td><span class="badge ${u.active?'badge-active':'badge-cancelled'}">${u.active?'Active':'Inactive'}</span></td>
         <td>${fmtDate(u.created_at)}</td>
@@ -2234,7 +2637,7 @@ async function renderUsers() {
 async function openUserModal(id) {
   _userEdit = id;
   document.getElementById('modal-user-title').textContent = id ? 'Edit User' : 'Add User';
-  ['name','username','password'].forEach(f => document.getElementById('usr-'+f).value = '');
+  ['name','username','password','email'].forEach(f => document.getElementById('usr-'+f).value = '');
   const u = id ? (_allUsers.find(x=>x.id===id) || (await GET('/api/users')).find(x=>x.id===id)) : null;
   const self = u && u.id === _currentUser.id;
   const sel = document.getElementById('usr-role');
@@ -2249,6 +2652,7 @@ async function openUserModal(id) {
   if (u) {
     document.getElementById('usr-name').value     = u.name;
     document.getElementById('usr-username').value = u.username;
+    document.getElementById('usr-email').value    = u.email || '';
   }
   openModal('modal-user');
 }
@@ -2257,7 +2661,8 @@ async function saveUser() {
   const body = {
     name:     document.getElementById('usr-name').value.trim(),
     username: document.getElementById('usr-username').value.trim(),
-    role:     document.getElementById('usr-role').value
+    role:     document.getElementById('usr-role').value,
+    email:    document.getElementById('usr-email').value.trim()
   };
   const pw = document.getElementById('usr-password').value;
   if (!_userEdit && !pw) { toast('Password required','error'); return; }
@@ -2270,7 +2675,7 @@ async function saveUser() {
       delete body.username;
       const updated = await PATCH('/api/users/'+_userEdit, body);
       if (_userEdit === _currentUser.id) {
-        _currentUser.name = updated.name; localStorage.setItem('cr_user', JSON.stringify(_currentUser));
+        _currentUser.name = updated.name; _currentUser.email = updated.email; localStorage.setItem('cr_user', JSON.stringify(_currentUser));
         document.getElementById('user-name-display').textContent = updated.name;
       }
     } else await POST('/api/users', body);
@@ -2332,6 +2737,7 @@ async function renderSettings() {
         <div class="stat-card"><div class="stat-label">Payments</div><div class="stat-value">${c.payments}</div></div>
         <div class="stat-card"><div class="stat-label">Expenses</div><div class="stat-value">${c.expenses}</div></div>
       </div>
+      <div id="email-card" class="card" style="max-width:760px;margin-bottom:20px"><div class="text-dim">Loading email settings…</div></div>
       <div class="card" style="max-width:760px;margin-bottom:20px">
         <div class="card-header"><span class="card-title">🏷️ Loyalty discount</span></div>
         <p class="text-dim" style="font-size:.88rem;margin-bottom:14px;line-height:1.5">
@@ -2375,7 +2781,81 @@ async function renderSettings() {
         </div>
         ${c.rentals_out ? `<p class="text-dim" style="font-size:.8rem;margin-top:12px">Note: ${c.rentals_out} rental(s) are still out — equipment can't be cleared until they're marked Returned.</p>` : ''}
       </div>`;
+    loadEmailCard();
   } catch (err) { document.getElementById('page-content').innerHTML = `<div class="empty text-red">${err.message}</div>`; }
+}
+
+// ── Email (Resend) settings ────────────────────────────────────────
+async function loadEmailCard() {
+  const box = document.getElementById('email-card'); if (!box) return;
+  let e;
+  try { e = await GET('/api/email'); } catch (err) { box.innerHTML = `<div class="text-red">${escH(err.message)}</div>`; return; }
+  const st = e.settings;
+  const status = !e.configured
+    ? `<div class="mail-status off">⛔<div><strong>Email is off.</strong> Add <code>RESEND_API_KEY</code> in Render → your web service → Environment, then Save. See the steps in the README.</div></div>`
+    : e.using_test_sender
+    ? `<div class="mail-status warn">⚠️<div><strong>Email is on, in test mode.</strong> Sending as <code>${escH(e.from)}</code>, which only delivers to your own Resend sign-up email.
+         To reach clients, verify your domain in Resend → Domains and set <code>EMAIL_FROM</code> (e.g. <code>Creative Rentals &lt;bookings@yourdomain.com&gt;</code>).</div></div>`
+    : `<div class="mail-status ok">✅<div><strong>Email is on.</strong> Sending as <code>${escH(e.from)}</code>.
+         ${e.counts.sent_24h} sent in the last 24 hours (free plan limit: 100 a day), ${e.counts.sent_month} this month (limit 3,000).</div></div>`;
+  const tog = (k, title, sub) => `<label class="mail-toggle"><input type="checkbox" id="em-${k}" ${st[k] ? 'checked' : ''}><span>${title}<small>${sub}</small></span></label>`;
+  const recips = e.summary_recipients.length ? e.summary_recipients.join(', ') : '<span class="text-red">nobody yet — add your email under 🔑 My account, or type addresses below</span>';
+  box.innerHTML = `
+    <div class="card-header"><span class="card-title">📧 Email (Resend)</span></div>
+    ${status}
+    <p class="text-dim" style="font-size:.85rem;margin:0 0 6px">${e.clients.with_email} of ${e.clients.total} clients have an email address. Clients without one won't get reminders — add emails on the Clients page.</p>
+    ${tog('reminders', 'Return reminders', 'To the client 2 hours before the return time on the return day (5:00 PM for a 7:00 PM return).')}
+    ${tog('overdue', 'Overdue notices', 'To the client when a rental becomes overdue, then each morning — at most 3, only for rentals due in the last 3 days.')}
+    ${tog('summary', 'Daily summary to me', 'Money received, expenses, overdue rentals and tomorrow\'s pickups &amp; returns.')}
+    <div class="input-row" style="margin-top:12px">
+      <div class="form-group"><label>Send the daily summary at</label><input id="em-time" type="time" step="900" value="${escH(st.summary_time)}"></div>
+      <div class="form-group"><label>Client replies go to</label><input id="em-reply" type="email" value="${escH(st.reply_to)}" placeholder="creativerentals25@gmail.com"></div>
+    </div>
+    <div class="form-group"><label>Send the daily summary to <span class="text-dim">(leave blank = every Super Admin's own email)</span></label>
+      <input id="em-to" placeholder="you@example.com, partner@example.com" value="${escH(st.summary_to)}">
+      <div class="text-dim" style="font-size:.78rem;margin-top:4px">Currently goes to: ${recips}</div></div>
+    <div class="flex gap-2" style="flex-wrap:wrap;margin-bottom:16px">
+      <button class="btn btn-primary" onclick="saveEmailSettings()">Save email settings</button>
+      <button class="btn btn-secondary" onclick="sendSummaryNow()" ${e.configured ? '' : 'disabled'}>📊 Send today's summary now</button>
+    </div>
+    <div class="form-group" style="margin-bottom:6px"><label>Send a test email</label>
+      <div style="display:flex;gap:8px"><input id="em-test" type="email" placeholder="you@example.com" value="${escH((_currentUser && _currentUser.email) || '')}" style="flex:1">
+      <button class="btn btn-secondary" onclick="sendTestEmail()" ${e.configured ? '' : 'disabled'}>Send test</button></div></div>
+    <details style="margin-top:14px" ${e.counts.failed_7d ? 'open' : ''}>
+      <summary style="cursor:pointer;font-weight:600">Recent emails (${e.log.length})${e.counts.failed_7d ? ` <span class="text-red">— ${e.counts.failed_7d} failed this week</span>` : ''}</summary>
+      ${e.log.length ? `<div class="table-wrap" style="margin-top:10px"><table>
+        <thead><tr><th>When</th><th>Type</th><th>To</th><th>Status</th></tr></thead>
+        <tbody>${e.log.map(m => `<tr>
+          <td data-label="When">${fmtDateTime(m.at)}</td>
+          <td data-label="Type">${MAIL_KIND[m.kind] || m.kind}${m.rental_id ? ` <span class="text-dim">#R-${String(m.rental_id).padStart(4,'0')}</span>` : ''}</td>
+          <td data-label="To" style="word-break:break-all">${escH(m.client_name ? m.client_name + ' · ' : '')}${escH(m.to_addr)}</td>
+          <td data-label="Status">${m.status === 'sent' ? '<span class="badge badge-active">Sent</span>' : m.status === 'failed'
+              ? `<span class="badge badge-overdue">Failed</span><div class="text-dim" style="font-size:.75rem;margin-top:3px">${escH(m.error || '')}</div>` : '<span class="badge badge-booked">Sending</span>'}</td>
+        </tr>`).join('')}</tbody></table></div>` : '<p class="text-dim" style="margin-top:8px">No emails sent yet.</p>'}
+    </details>`;
+}
+async function saveEmailSettings() {
+  try {
+    await PUT('/api/email/settings', {
+      reminders: document.getElementById('em-reminders').checked,
+      overdue:   document.getElementById('em-overdue').checked,
+      summary:   document.getElementById('em-summary').checked,
+      summary_time: document.getElementById('em-time').value || '19:30',
+      reply_to:  document.getElementById('em-reply').value.trim(),
+      summary_to: document.getElementById('em-to').value.trim() });
+    toast('Email settings saved'); loadEmailCard();
+  } catch (err) { toast(err.message, 'error'); }
+}
+async function sendTestEmail() {
+  const to = document.getElementById('em-test').value.trim();
+  try { await POST('/api/email/test', { to }); toast('Test email sent to ' + to + ' — check the inbox (and spam)'); }
+  catch (err) { toast(err.message, 'error'); }
+  loadEmailCard();
+}
+async function sendSummaryNow() {
+  try { const r = await POST('/api/email/summary-now', {}); toast('Summary sent to ' + r.to.join(', ')); }
+  catch (err) { toast(err.message, 'error'); }
+  loadEmailCard();
 }
 
 async function saveDiscountRules() {
@@ -2462,6 +2942,13 @@ async function doClear() {
   document.getElementById('rnt-start').addEventListener('change', () => refreshAvailability());
   document.getElementById('rnt-end').addEventListener('change', () => refreshAvailability());
 
+  // Email features only show once email (Resend) is switched on
+  GET('/api/auth/config').then(c => {
+    document.getElementById('forgot-link').hidden = !c.email;
+    document.getElementById('btn-email-invoice').hidden = !c.email;
+  }).catch(() => {});
+  const resetToken = new URLSearchParams(location.search).get('reset');
+  if (resetToken) { if (_token) doLogout(); await openResetFromLink(resetToken); return; }
   if (_token) {
     await bootApp();
   }
